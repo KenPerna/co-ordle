@@ -10,6 +10,19 @@ type GameMode = "shared" | "dual";
 interface SharedRound { type: "shared"; guess: string; result: string[]; player: string; }
 interface DualViewRound { own?: { word: string; result: string[] }; partnerResult?: string[]; waiting?: boolean; }
 interface ChatMsg { player: string; text: string; system?: boolean; }
+interface TeamTotal { intelligence: number; coins: number; streak: number; }
+interface RewardInfo {
+  intelligence: number;
+  coins: number;
+  almostBonus: boolean;
+  greatTeamwork: boolean;
+  streakDays: number;
+  dailyBonus: number;
+  streakMultiplier: number;
+  elapsedFormatted: string;
+  guessesUsed: number;
+  teamTotal: { intelligence: number; coins: number };
+}
 
 const TILE_BG: Record<TileColor, string> = {
   green: "#538d4e", yellow: "#b59f3b", gray: "#3a3a3c", empty: "#121213", pending: "#2a2a2c",
@@ -28,7 +41,7 @@ function Tile({ letter, color, size = 52 }: { letter?: string; color: TileColor;
       width: size, height: size, display: "flex", alignItems: "center", justifyContent: "center",
       fontSize: size * 0.4, fontWeight: 700, border: `2px solid ${color === "empty" ? "#3a3a3c" : TILE_BG[color]}`,
       borderRadius: 4, background: TILE_BG[color], color: "#fff", textTransform: "uppercase",
-      transition: "background 0.2s",
+      transition: "background 0.3s",
     }}>
       {letter ?? ""}
     </div>
@@ -39,7 +52,6 @@ function Board({ rounds, maxRows = ROWS, cols = COLS, showLetters = true, tileSi
   rounds: { letters: string[]; colors: TileColor[] }[];
   maxRows?: number; cols?: number; showLetters?: boolean; tileSize?: number;
 }) {
-  const empty = Array(cols).fill(null).map((_, i) => ({ letters: [], colors: [] }));
   const rows = [...rounds, ...Array(Math.max(0, maxRows - rounds.length)).fill({ letters: [], colors: [] })];
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${tileSize}px)`, gap: 5 }}>
@@ -54,6 +66,124 @@ function Board({ rounds, maxRows = ROWS, cols = COLS, showLetters = true, tileSi
   );
 }
 
+function RewardScreen({ status, winner, revealWord, rewards, playerName, onLeave }: {
+  status: GameStatus; winner: string | null; revealWord: string | null;
+  rewards: RewardInfo | null; playerName: string; onLeave: () => void;
+}) {
+  const won = status === "won";
+  const isWinner = winner === playerName;
+
+  return (
+    <div style={s.overlay}>
+      <style>{`
+        @keyframes rise { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+        .result-card { animation: rise 0.4s ease; }
+        .reward-row { animation: rise 0.5s ease 0.15s both; }
+      `}</style>
+      <div style={s.resultCard} className="result-card">
+        {/* Title */}
+        <div style={{ textAlign: "center", marginBottom: 16 }}>
+          {won ? (
+            <>
+              <div style={{ fontSize: 13, letterSpacing: 3, color: "#538d4e", textTransform: "uppercase", marginBottom: 4 }}>Puzzle Solved!</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff", animation: "pulse 1.2s ease-in-out infinite" }}>
+                {isWinner ? "YOU WON!" : `${winner} WON!`}
+              </div>
+              <div style={{ fontSize: 14, color: "#818384", marginTop: 4 }}>
+                {isWinner ? "Excellent teamwork!" : "Better luck next round."}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, letterSpacing: 3, color: "#b59f3b", textTransform: "uppercase", marginBottom: 4 }}>Game Over</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff" }}>
+                The word was <span style={{ color: "#b59f3b" }}>{revealWord}</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Stats row */}
+        {rewards && (
+          <div style={s.statsRow} className="reward-row">
+            <StatBox label="Time" value={rewards.elapsedFormatted} />
+            <StatBox label="Guesses" value={`${rewards.guessesUsed} / ${ROWS}`} />
+            {rewards.streakDays > 0 && (
+              <StatBox label="Streak" value={`${rewards.streakDays}d`} accent="#f97316" />
+            )}
+          </div>
+        )}
+
+        {/* Special messages */}
+        {rewards?.almostBonus && (
+          <div style={s.bonusBanner}>
+            You were ONE letter away! <span style={{ color: "#538d4e" }}>+8 Intelligence</span>
+          </div>
+        )}
+        {rewards?.greatTeamwork && (
+          <div style={{ ...s.bonusBanner, borderColor: "#3b82f6", color: "#93c5fd" }}>
+            Great teamwork! Both players contributed this round.
+          </div>
+        )}
+        {rewards?.dailyBonus ? (
+          <div style={{ ...s.bonusBanner, borderColor: "#f97316", color: "#fdba74" }}>
+            Daily bonus: <span style={{ fontWeight: 700 }}>+3 coins</span> for playing today!
+          </div>
+        ) : null}
+
+        {/* Token rewards */}
+        {rewards && (
+          <div style={s.tokenSection} className="reward-row">
+            <TokenRow icon="🧠" label="Intelligence" earned={rewards.intelligence} total={rewards.teamTotal.intelligence} color="#538d4e" />
+            <TokenRow icon="🪙" label="Coins" earned={rewards.coins} total={rewards.teamTotal.coins} color="#b59f3b" />
+            {rewards.streakMultiplier > 1 && (
+              <div style={{ fontSize: 12, color: "#818384", textAlign: "center", marginTop: 4 }}>
+                {rewards.streakMultiplier.toFixed(1)}x streak multiplier applied
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+          <div style={{ ...s.btn, flex: 1, textAlign: "center", background: "#1a1a1b", border: "1px solid #3a3a3c", cursor: "pointer", color: "#818384", fontSize: 14 }}
+            onClick={onLeave}>
+            Leave Room
+          </div>
+          <div style={{ ...s.btn, flex: 1, textAlign: "center", cursor: "default", color: "#818384", background: "#1a1a1b", border: "1px solid #3a3a3c", fontSize: 13 }}>
+            Next round in a moment...
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatBox({ label, value, accent = "#fff" }: { label: string; value: string; accent?: string }) {
+  return (
+    <div style={{ flex: 1, textAlign: "center", background: "#1a1a1b", borderRadius: 8, padding: "10px 4px" }}>
+      <div style={{ fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: accent, marginTop: 2 }}>{value}</div>
+    </div>
+  );
+}
+
+function TokenRow({ icon, label, earned, total, color }: { icon: string; label: string; earned: number; total: number; color: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #2a2a2c" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 20 }}>{icon}</span>
+        <span style={{ fontSize: 14, color: "#ccc" }}>{label}</span>
+      </div>
+      <div style={{ textAlign: "right" }}>
+        <span style={{ fontSize: 20, fontWeight: 800, color }}>+{earned}</span>
+        <span style={{ fontSize: 11, color: "#818384", marginLeft: 8 }}>Total: {total}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Game() {
   const [playerName] = useState(() => `Player${Math.floor(Math.random() * 900 + 100)}`);
   const [roomInput, setRoomInput] = useState("");
@@ -62,6 +192,7 @@ export default function Game() {
   const [gameId, setGameId] = useState("");
   const [gameMode, setGameMode] = useState<GameMode>("shared");
   const [players, setPlayers] = useState<string[]>([]);
+  const [teamTotal, setTeamTotal] = useState<TeamTotal>({ intelligence: 0, coins: 0, streak: 0 });
 
   const [sharedRounds, setSharedRounds] = useState<SharedRound[]>([]);
   const [dualRounds, setDualRounds] = useState<DualViewRound[]>([]);
@@ -71,6 +202,7 @@ export default function Game() {
   const [gameStatus, setGameStatus] = useState<GameStatus>("playing");
   const [winner, setWinner] = useState<string | null>(null);
   const [revealWord, setRevealWord] = useState<string | null>(null);
+  const [rewards, setRewards] = useState<RewardInfo | null>(null);
 
   const [currentGuess, setCurrentGuess] = useState("");
   const [wordError, setWordError] = useState<string | null>(null);
@@ -82,7 +214,6 @@ export default function Game() {
 
   const socketRef = useRef<Socket | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addSystem = (text: string) =>
     setChatMessages((prev) => [...prev, { player: "System", text, system: true }]);
@@ -94,11 +225,12 @@ export default function Game() {
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
 
-    socket.on("gameState", ({ mode, rounds, status, winner: w, players: ps }: any) => {
+    socket.on("gameState", ({ mode, rounds, status, winner: w, players: ps, teamTotal: tt }: any) => {
       setGameMode(mode);
       setPlayers(ps ?? []);
       setGameStatus(status ?? "playing");
       setWinner(w ?? null);
+      if (tt) setTeamTotal(tt);
       if (mode === "shared") setSharedRounds(rounds ?? []);
       else setDualRounds(rounds ?? []);
     });
@@ -148,14 +280,18 @@ export default function Game() {
     });
 
     socket.on("wordAlreadyUsed", ({ guess }: { guess: string }) => {
-      setWordError(`"${guess}" was already guessed this round`);
+      setWordError(`"${guess.toUpperCase()}" was already guessed`);
       setTimeout(() => setWordError(null), 3000);
     });
 
-    socket.on("gameOver", ({ status, winner: w, word }: { status: GameStatus; winner?: string; word: string }) => {
+    socket.on("gameOver", ({ status, winner: w, word, rewards: r }: {
+      status: GameStatus; winner?: string; word: string; rewards?: RewardInfo;
+    }) => {
       setGameStatus(status);
       setWinner(w ?? null);
       setRevealWord(word);
+      setRewards(r ?? null);
+      if (r?.teamTotal) setTeamTotal((prev) => ({ ...prev, intelligence: r.teamTotal.intelligence, coins: r.teamTotal.coins }));
     });
 
     socket.on("newRound", () => {
@@ -164,6 +300,7 @@ export default function Game() {
       setGameStatus("playing");
       setWinner(null);
       setRevealWord(null);
+      setRewards(null);
       setWaitingForPartner(false);
       setPartnerReady(false);
       addSystem("New round started!");
@@ -190,6 +327,7 @@ export default function Game() {
     setGameStatus("playing");
     setWinner(null);
     setRevealWord(null);
+    setRewards(null);
     socketRef.current.emit("joinRoom", { gameId: id, player: playerName, mode: modeInput });
   }, [roomInput, modeInput, playerName]);
 
@@ -200,6 +338,8 @@ export default function Game() {
     setChatMessages([]);
     setWaitingForPartner(false);
     setPartnerReady(false);
+    setRewards(null);
+    setGameStatus("playing");
   }, []);
 
   const submitGuess = useCallback(() => {
@@ -208,10 +348,7 @@ export default function Game() {
     if (gameMode === "dual" && waitingForPartner) return;
 
     if (gameMode === "dual") {
-      setDualRounds((prev) => [...prev, {
-        own: { word: guess, result: [] },
-        waiting: true,
-      }]);
+      setDualRounds((prev) => [...prev, { own: { word: guess, result: [] }, waiting: true }]);
     }
 
     socketRef.current.emit("guess", { gameId, playerId: playerName, guess });
@@ -231,20 +368,9 @@ export default function Game() {
     socketRef.current.emit("typing", { gameId, player: playerName });
   }, [gameId, playerName]);
 
-  const sharedBoardRows = sharedRounds.map((r) => ({
-    letters: r.guess.split(""),
-    colors: r.result as TileColor[],
-  }));
-
-  const myBoardRows = dualRounds.map((r) => ({
-    letters: r.own ? r.own.word.split("") : [],
-    colors: (r.own?.result ?? []) as TileColor[],
-  }));
-
-  const partnerBoardRows = dualRounds.map((r) => ({
-    letters: [],
-    colors: (r.partnerResult ?? []) as TileColor[],
-  }));
+  const sharedBoardRows = sharedRounds.map((r) => ({ letters: r.guess.split(""), colors: r.result as TileColor[] }));
+  const myBoardRows = dualRounds.map((r) => ({ letters: r.own ? r.own.word.split("") : [], colors: (r.own?.result ?? []) as TileColor[] }));
+  const partnerBoardRows = dualRounds.map((r) => ({ letters: [], colors: (r.partnerResult ?? []) as TileColor[] }));
 
   const guessCount = gameMode === "shared" ? sharedRounds.length : dualRounds.length;
   const isInputDisabled = gameStatus !== "playing" || (gameMode === "dual" && waitingForPartner);
@@ -254,10 +380,10 @@ export default function Game() {
   else if (gameMode === "dual" && partnerReady && !waitingForPartner) statusText = "Partner is ready — make your guess!";
   else if (guessCount > 0) statusText = `${ROWS - guessCount} guess${ROWS - guessCount === 1 ? "" : "es"} remaining`;
 
+  // ─── Lobby ──────────────────────────────────────────────────────────────────
   if (!inRoom) {
     return (
       <div style={s.page}>
-        <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.04);opacity:.85}}`}</style>
         <header style={s.header}>
           <h1 style={s.title}>Co-Ordle</h1>
           <span style={{ ...s.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
@@ -298,42 +424,42 @@ export default function Game() {
     );
   }
 
+  // ─── Game ────────────────────────────────────────────────────────────────────
   return (
     <div style={s.page}>
-      <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.8}} @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
       {gameStatus !== "playing" && (
-        <div style={s.overlay}>
-          <div style={{ animation: "pulse 1s ease-in-out infinite", textAlign: "center" }}>
-            {gameStatus === "won" ? (
-              <>
-                <div style={{ fontSize: 52, fontWeight: 900, color: "#538d4e", letterSpacing: 4 }}>
-                  {winner === playerName ? "YOU WON!" : `${winner} WON!`}
-                </div>
-                <div style={{ fontSize: 20, color: "#ccc", marginTop: 8 }}>
-                  {winner === playerName ? "Brilliant guess!" : "Better luck next round."}
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 52, fontWeight: 900, color: "#b59f3b", letterSpacing: 4 }}>GAME OVER</div>
-                <div style={{ fontSize: 20, color: "#ccc", marginTop: 8 }}>
-                  The word was <strong style={{ color: "#fff" }}>{revealWord}</strong>
-                </div>
-              </>
-            )}
-            <div style={{ fontSize: 14, color: "#818384", marginTop: 16 }}>Next round starting soon...</div>
-          </div>
-        </div>
+        <RewardScreen
+          status={gameStatus}
+          winner={winner}
+          revealWord={revealWord}
+          rewards={rewards}
+          playerName={playerName}
+          onLeave={leaveRoom}
+        />
       )}
 
       <header style={s.header}>
         <h1 style={s.title}>Co-Ordle</h1>
         <span style={{ ...s.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
         <span style={{ ...s.roomTag, userSelect: "all", cursor: "text" }} title="Tap to copy room name">{gameId}</span>
-        <span style={{ fontSize: 12, color: "#818384", marginLeft: 8 }}>
-          {gameMode === "dual" ? "DUAL BRAIN" : "SHARED"}
-        </span>
+        <span style={{ fontSize: 11, color: "#818384" }}>{gameMode === "dual" ? "DUAL" : "SHARED"}</span>
+        {/* Token display */}
+        <div style={s.tokenBadge} title="Intelligence tokens">
+          <span style={{ color: "#538d4e" }}>🧠</span>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>{teamTotal.intelligence}</span>
+        </div>
+        <div style={s.tokenBadge} title="Coins">
+          <span style={{ color: "#b59f3b" }}>🪙</span>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>{teamTotal.coins}</span>
+        </div>
+        {teamTotal.streak > 0 && (
+          <div style={{ ...s.tokenBadge, color: "#f97316" }} title="Day streak">
+            <span>🔥</span>
+            <span style={{ fontWeight: 700, fontSize: 13 }}>{teamTotal.streak}</span>
+          </div>
+        )}
         <button style={s.leaveBtn} onClick={leaveRoom} data-testid="button-leave">Leave</button>
         <span style={{ ...s.playerTag, color: playerColor(playerName) }}>{playerName}</span>
       </header>
@@ -383,13 +509,11 @@ export default function Game() {
         <section style={s.chatSection}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <h2 style={s.chatTitle}>Chat</h2>
-            {players.length > 0 && (
-              <div style={{ display: "flex", gap: 6 }}>
-                {players.map((p) => (
-                  <span key={p} style={{ fontSize: 11, color: playerColor(p), fontWeight: 700 }}>{p}</span>
-                ))}
-              </div>
-            )}
+            <div style={{ display: "flex", gap: 6 }}>
+              {players.map((p) => (
+                <span key={p} style={{ fontSize: 11, color: playerColor(p), fontWeight: 700 }}>{p}</span>
+              ))}
+            </div>
           </div>
           <div style={s.chatBox}>
             {chatMessages.map((msg, i) => (
@@ -426,25 +550,30 @@ export default function Game() {
 
 const s: Record<string, React.CSSProperties> = {
   page: { minHeight: "100vh", background: "#121213", color: "#fff", fontFamily: "'Inter', 'Segoe UI', sans-serif", display: "flex", flexDirection: "column" },
-  header: { display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", borderBottom: "1px solid #2a2a2c", flexWrap: "wrap" },
-  title: { margin: 0, fontSize: 20, fontWeight: 800, letterSpacing: 3, textTransform: "uppercase" },
+  header: { display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: "1px solid #2a2a2c", flexWrap: "wrap" },
+  title: { margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: "uppercase" },
   dot: { width: 9, height: 9, borderRadius: "50%", display: "inline-block", flexShrink: 0 },
-  roomTag: { fontSize: 14, color: "#538d4e", fontWeight: 700 },
-  leaveBtn: { marginLeft: "auto", padding: "6px 14px", borderRadius: 8, border: "1px solid #3a3a3c", background: "transparent", color: "#818384", fontSize: 13, cursor: "pointer" },
+  roomTag: { fontSize: 13, color: "#538d4e", fontWeight: 700 },
+  tokenBadge: { display: "flex", alignItems: "center", gap: 4, background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 20, padding: "3px 9px", fontSize: 12, color: "#ccc" },
+  leaveBtn: { marginLeft: "auto", padding: "6px 12px", borderRadius: 8, border: "1px solid #3a3a3c", background: "transparent", color: "#818384", fontSize: 13, cursor: "pointer" },
   playerTag: { fontSize: 13, fontWeight: 700 },
-  lobby: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, gap: 0 },
+  lobby: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 },
   lobbyTitle: { margin: "0 0 24px", fontSize: 26, fontWeight: 800 },
-  main: { display: "flex", flex: 1, gap: 24, padding: 16, flexWrap: "wrap" },
+  main: { display: "flex", flex: 1, gap: 20, padding: 16, flexWrap: "wrap" },
   gameSection: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, minWidth: 280 },
   statusText: { fontSize: 14, color: "#818384", margin: 0, textAlign: "center" },
   boardLabel: { fontSize: 12, color: "#818384", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px", textAlign: "center" },
   inputRow: { display: "flex", gap: 8, width: "100%", maxWidth: 360 },
-  input: { padding: "13px 14px", borderRadius: 10, border: "1px solid #3a3a3c", background: "#1a1a1b", color: "#fff", fontSize: 16, outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const },
-  btn: { padding: "13px 20px", borderRadius: 10, border: "none", background: "#538d4e", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", whiteSpace: "nowrap" },
+  input: { padding: "13px 14px", borderRadius: 10, border: "1px solid #3a3a3c", background: "#1a1a1b", color: "#fff", fontSize: 16, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
+  btn: { padding: "13px 18px", borderRadius: 10, border: "none", background: "#538d4e", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", whiteSpace: "nowrap" },
   chatSection: { display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 260, maxWidth: 380 },
-  chatTitle: { margin: 0, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#818384" },
-  chatBox: { flex: 1, minHeight: 260, maxHeight: 420, overflowY: "auto", background: "#1a1a1b", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 5, border: "1px solid #2a2a2c" },
+  chatTitle: { margin: 0, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#818384" },
+  chatBox: { flex: 1, minHeight: 260, maxHeight: 400, overflowY: "auto", background: "#1a1a1b", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 5, border: "1px solid #2a2a2c" },
   chatMsg: { fontSize: 14, lineHeight: 1.5, wordBreak: "break-word" },
-  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 },
-  wordError: { background: "#3a1a1a", border: "1px solid #b59f3b", color: "#b59f3b", borderRadius: 8, padding: "8px 14px", fontSize: 13, animation: "fadeIn 0.2s ease" },
+  wordError: { background: "#2a1a1a", border: "1px solid #b59f3b", color: "#b59f3b", borderRadius: 8, padding: "7px 12px", fontSize: 13, animation: "fadeIn 0.2s ease" },
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 },
+  resultCard: { background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 420 },
+  statsRow: { display: "flex", gap: 8, marginBottom: 14 },
+  bonusBanner: { border: "1px solid #538d4e", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#86efac", marginBottom: 10, textAlign: "center" },
+  tokenSection: { background: "#121213", borderRadius: 10, padding: "0 12px", marginBottom: 4 },
 };
