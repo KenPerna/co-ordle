@@ -109,9 +109,9 @@ function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
   );
 }
 
-function RewardScreen({ status, winner, revealWord, rewards, playerName, onLeave }: {
+function RewardScreen({ status, winner, revealWord, rewards, playerName, onLeave, onDismiss }: {
   status: GameStatus; winner: string | null; revealWord: string | null;
-  rewards: RewardInfo | null; playerName: string; onLeave: () => void;
+  rewards: RewardInfo | null; playerName: string; onLeave: () => void; onDismiss: () => void;
 }) {
   const won = status === "won";
   const isWinner = winner === playerName;
@@ -194,8 +194,9 @@ function RewardScreen({ status, winner, revealWord, rewards, playerName, onLeave
             onClick={onLeave}>
             Leave Room
           </div>
-          <div style={{ ...s.btn, flex: 1, textAlign: "center", cursor: "default", color: "#818384", background: "#1a1a1b", border: "1px solid #3a3a3c", fontSize: 13 }}>
-            Next round in a moment...
+          <div style={{ ...s.btn, flex: 1, textAlign: "center", cursor: "pointer", fontSize: 15 }}
+            onClick={onDismiss}>
+            Play Next Round
           </div>
         </div>
       </div>
@@ -246,6 +247,7 @@ export default function Game() {
   const [winner, setWinner] = useState<string | null>(null);
   const [revealWord, setRevealWord] = useState<string | null>(null);
   const [rewards, setRewards] = useState<RewardInfo | null>(null);
+  const [showRewardScreen, setShowRewardScreen] = useState(false);
 
   const [currentGuess, setCurrentGuess] = useState("");
   const [wordError, setWordError] = useState<string | null>(null);
@@ -334,6 +336,7 @@ export default function Game() {
       setWinner(w ?? null);
       setRevealWord(word);
       setRewards(r ?? null);
+      setShowRewardScreen(true);
       if (r?.teamTotal) setTeamTotal((prev) => ({ ...prev, intelligence: r.teamTotal.intelligence, coins: r.teamTotal.coins }));
     });
 
@@ -343,10 +346,10 @@ export default function Game() {
       setGameStatus("playing");
       setWinner(null);
       setRevealWord(null);
-      setRewards(null);
       setWaitingForPartner(false);
       setPartnerReady(false);
       addSystem("New round started!");
+      // NOTE: do NOT clear showRewardScreen here — player must dismiss manually
     });
 
     socket.on("chatMessage", (msg: ChatMsg) => setChatMessages((prev) => [...prev, msg]));
@@ -383,6 +386,7 @@ export default function Game() {
     setPartnerReady(false);
     setRewards(null);
     setGameStatus("playing");
+    setShowRewardScreen(false);
   }, []);
 
   const submitGuess = useCallback(() => {
@@ -496,7 +500,7 @@ export default function Game() {
     <div style={s.page}>
       <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
-      {gameStatus !== "playing" && (
+      {showRewardScreen && (
         <RewardScreen
           status={gameStatus}
           winner={winner}
@@ -504,6 +508,7 @@ export default function Game() {
           rewards={rewards}
           playerName={playerName}
           onLeave={leaveRoom}
+          onDismiss={() => setShowRewardScreen(false)}
         />
       )}
 
