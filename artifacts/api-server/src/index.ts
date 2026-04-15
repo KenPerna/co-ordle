@@ -2,6 +2,7 @@ import http from "http";
 import { Server } from "socket.io";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { evaluateGuess, pickSecretWord } from "./game/wordEngine";
 
 const rawPort = process.env["PORT"];
 
@@ -22,15 +23,38 @@ const io = new Server(server, {
   cors: { origin: "*" },
 });
 
+let secretWord = pickSecretWord();
+logger.info({ secretWord }, "New game started");
+
 io.on("connection", (socket) => {
   logger.info({ socketId: socket.id }, "Socket connected");
 
-  socket.on("guess", (data) => {
-    io.emit("guessUpdate", data);
+  socket.on("guess", (data: { guess: string; player: string }) => {
+    const guess = data.guess?.toLowerCase().trim();
+    if (!guess) return;
+
+    const result = evaluateGuess(secretWord, guess);
+    const won = result.every((r) => r === "green");
+
+    logger.info({ socketId: socket.id, guess, result, won }, "Guess evaluated");
+
+    io.emit("guessUpdate", {
+      guess,
+      result,
+      player: data.player ?? socket.id,
+      won,
+    });
+
+    if (won) {
+      io.emit("gameOver", { winner: data.player ?? socket.id, word: secretWord });
+      secretWord = pickSecretWord();
+      logger.info({ secretWord }, "New round started");
+      io.emit("newRound", { message: "New round started!" });
+    }
   });
 
-  socket.on("chat", (msg) => {
-    io.emit("chatMessage", msg);
+  socket.on("chat", (msg: { player: string; text: string }) => {
+    io.emit("chatMessage", { player: msg.player ?? socket.id, text: msg.text });
   });
 
   socket.on("disconnect", () => {
