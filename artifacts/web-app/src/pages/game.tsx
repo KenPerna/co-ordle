@@ -150,7 +150,7 @@ export default function Game() {
       <header style={styles.header}>
         <h1 style={styles.title}>Wordle Live</h1>
         <span style={{ ...styles.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
-        <span style={styles.roomTag}>#{gameId}</span>
+        <span style={styles.roomTag} title="Room name — copy to invite friends">{gameId}</span>
         <button style={styles.leaveBtn} onClick={() => setInRoom(false)} data-testid="button-leave">
           Leave
         </button>
@@ -194,7 +194,7 @@ export default function Game() {
         </section>
 
         <section style={styles.chatSection}>
-          <h2 style={styles.chatTitle}>Chat — #{gameId}</h2>
+          <h2 style={styles.chatTitle}>Chat — {gameId}</h2>
           <div style={styles.chatMessages}>
             {chatMessages.map((msg, i) => (
               <div key={i} style={styles.chatMsg}>
@@ -259,10 +259,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: "inline-block",
   },
   roomTag: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#538d4e",
     fontWeight: 700,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+    cursor: "text",
+    userSelect: "all",
   },
   leaveBtn: {
     padding: "4px 12px",
