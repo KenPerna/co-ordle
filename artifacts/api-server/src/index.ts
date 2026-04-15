@@ -30,45 +30,68 @@ interface GuessEntry {
   won: boolean;
 }
 
-let gameState: { word: string; guesses: GuessEntry[] } = {
-  word: pickSecretWord().toUpperCase(),
-  guesses: [],
-};
+interface RoomState {
+  word: string;
+  guesses: GuessEntry[];
+}
 
-logger.info({ word: gameState.word }, "New game started");
+const rooms = new Map<string, RoomState>();
+
+function getOrCreateRoom(gameId: string): RoomState {
+  if (!rooms.has(gameId)) {
+    const word = pickSecretWord().toUpperCase();
+    rooms.set(gameId, { word, guesses: [] });
+    logger.info({ gameId, word }, "Room created");
+  }
+  return rooms.get(gameId)!;
+}
 
 io.on("connection", (socket) => {
   logger.info({ socketId: socket.id }, "Socket connected");
 
-  socket.emit("gameState", {
-    guesses: gameState.guesses,
+  let currentRoom: string | null = null;
+
+  socket.on("joinRoom", ({ gameId, player }: { gameId: string; player: string }) => {
+    if (currentRoom) socket.leave(currentRoom);
+    currentRoom = gameId;
+    socket.join(gameId);
+
+    const room = getOrCreateRoom(gameId);
+    socket.emit("gameState", { guesses: room.guesses });
+    io.to(gameId).emit("playerJoined", { player });
+
+    logger.info({ socketId: socket.id, gameId, player }, "Player joined room");
   });
 
   socket.on("guess", (data: { guess: string; player: string }) => {
+    if (!currentRoom) return;
+
+    const room = getOrCreateRoom(currentRoom);
     const guess = data.guess?.toLowerCase().trim();
     if (!guess) return;
 
-    const result = evaluateGuess(gameState.word.toLowerCase(), guess);
+    const result = evaluateGuess(room.word.toLowerCase(), guess);
     const won = result.every((r) => r === "green");
     const player = data.player ?? socket.id;
 
     const entry: GuessEntry = { guess, result, player, won };
-    gameState.guesses.push(entry);
+    room.guesses.push(entry);
 
-    logger.info({ socketId: socket.id, guess, result, won }, "Guess evaluated");
+    logger.info({ socketId: socket.id, gameId: currentRoom, guess, result, won }, "Guess evaluated");
 
-    io.emit("guessUpdate", entry);
+    io.to(currentRoom).emit("guessUpdate", entry);
 
     if (won) {
-      io.emit("gameOver", { winner: player, word: gameState.word });
-      gameState = { word: pickSecretWord().toUpperCase(), guesses: [] };
-      logger.info({ word: gameState.word }, "New round started");
-      io.emit("newRound", { message: "New round started!" });
+      io.to(currentRoom).emit("gameOver", { winner: player, word: room.word });
+      rooms.set(currentRoom, { word: pickSecretWord().toUpperCase(), guesses: [] });
+      logger.info({ gameId: currentRoom }, "New round started");
+      io.to(currentRoom).emit("newRound", { message: "New round started!" });
     }
   });
 
   socket.on("chat", (msg: { player: string; text: string }) => {
-    io.emit("chatMessage", { player: msg.player ?? socket.id, text: msg.text });
+    if (!currentRoom) return;
+    io.to(currentRoom).emit("chatMessage", { player: msg.player ?? socket.id, text: msg.text });
   });
 
   socket.on("disconnect", () => {

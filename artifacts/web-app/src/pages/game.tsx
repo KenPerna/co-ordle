@@ -10,6 +10,7 @@ interface GuessRow {
   guess: string;
   result: TileColor[];
   player: string;
+  won?: boolean;
 }
 
 interface ChatMessage {
@@ -26,6 +27,10 @@ const TILE_COLORS: Record<TileColor, string> = {
 
 export default function Game() {
   const [playerName] = useState(() => `Player${Math.floor(Math.random() * 1000)}`);
+  const [gameId, setGameId] = useState("");
+  const [roomInput, setRoomInput] = useState("");
+  const [inRoom, setInRoom] = useState(false);
+
   const [guesses, setGuesses] = useState<GuessRow[]>([]);
   const [currentGuess, setCurrentGuess] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -51,6 +56,10 @@ export default function Game() {
       setGuesses((prev) => [...prev, data]);
     });
 
+    socket.on("playerJoined", ({ player }: { player: string }) => {
+      setChatMessages((prev) => [...prev, { player: "System", text: `${player} joined the room` }]);
+    });
+
     socket.on("gameOver", ({ winner, word }: { winner: string; word: string }) => {
       setStatus(`${winner} won! The word was "${word.toUpperCase()}"`);
     });
@@ -71,6 +80,17 @@ export default function Game() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  function joinRoom() {
+    const id = roomInput.trim();
+    if (!id || !socketRef.current) return;
+    setGameId(id);
+    setInRoom(true);
+    setGuesses([]);
+    setChatMessages([]);
+    setStatus("Guess the 5-letter word!");
+    socketRef.current.emit("joinRoom", { gameId: id, player: playerName });
+  }
+
   function submitGuess() {
     const guess = currentGuess.trim().toLowerCase();
     if (guess.length !== COLS || !socketRef.current) return;
@@ -90,16 +110,54 @@ export default function Game() {
     ...Array(Math.max(0, ROWS - guesses.length)).fill(null),
   ];
 
+  if (!inRoom) {
+    return (
+      <div style={styles.page}>
+        <header style={styles.header}>
+          <h1 style={styles.title}>Wordle Live</h1>
+          <span style={{ ...styles.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
+          <span style={styles.playerTag}>{playerName}</span>
+        </header>
+        <div style={styles.lobby}>
+          <h2 style={styles.lobbyTitle}>Join a Game Room</h2>
+          <p style={styles.lobbySubtitle}>Enter a room name to start or join an existing game</p>
+          <div style={styles.inputRow}>
+            <input
+              style={{ ...styles.input, flex: 1 }}
+              value={roomInput}
+              placeholder="e.g. room1, friends, office"
+              onChange={(e) => setRoomInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && joinRoom()}
+              data-testid="input-room"
+              autoFocus
+            />
+            <button
+              style={styles.button}
+              onClick={joinRoom}
+              data-testid="button-join"
+            >
+              Join
+            </button>
+          </div>
+          <p style={styles.lobbyHint}>Share the room name with friends so they can join the same game</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
       <header style={styles.header}>
         <h1 style={styles.title}>Wordle Live</h1>
         <span style={{ ...styles.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
+        <span style={styles.roomTag}>#{gameId}</span>
+        <button style={styles.leaveBtn} onClick={() => setInRoom(false)} data-testid="button-leave">
+          Leave
+        </button>
         <span style={styles.playerTag}>{playerName}</span>
       </header>
 
       <div style={styles.main}>
-        {/* Grid */}
         <section style={styles.gridSection}>
           <p style={styles.status}>{status}</p>
           <div style={styles.grid}>
@@ -129,23 +187,24 @@ export default function Game() {
               onKeyDown={(e) => e.key === "Enter" && submitGuess()}
               data-testid="input-guess"
             />
-            <button
-              style={styles.button}
-              onClick={submitGuess}
-              data-testid="button-guess"
-            >
+            <button style={styles.button} onClick={submitGuess} data-testid="button-guess">
               Guess
             </button>
           </div>
         </section>
 
-        {/* Chat */}
         <section style={styles.chatSection}>
-          <h2 style={styles.chatTitle}>Chat</h2>
+          <h2 style={styles.chatTitle}>Chat — #{gameId}</h2>
           <div style={styles.chatMessages}>
             {chatMessages.map((msg, i) => (
               <div key={i} style={styles.chatMsg}>
-                <span style={styles.chatPlayer}>{msg.player}: </span>
+                <span style={{
+                  ...styles.chatPlayer,
+                  color: msg.player === "System" ? "#818384" : "#538d4e",
+                  fontStyle: msg.player === "System" ? "italic" : "normal",
+                }}>
+                  {msg.player}:{" "}
+                </span>
                 <span>{msg.text}</span>
               </div>
             ))}
@@ -160,11 +219,7 @@ export default function Game() {
               onKeyDown={(e) => e.key === "Enter" && sendChat()}
               data-testid="input-chat"
             />
-            <button
-              style={styles.button}
-              onClick={sendChat}
-              data-testid="button-chat"
-            >
+            <button style={styles.button} onClick={sendChat} data-testid="button-chat">
               Send
             </button>
           </div>
@@ -203,10 +258,50 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "50%",
     display: "inline-block",
   },
+  roomTag: {
+    fontSize: 13,
+    color: "#538d4e",
+    fontWeight: 700,
+    letterSpacing: 1,
+  },
+  leaveBtn: {
+    padding: "4px 12px",
+    borderRadius: 6,
+    border: "1px solid #3a3a3c",
+    background: "transparent",
+    color: "#818384",
+    fontSize: 12,
+    cursor: "pointer",
+  },
   playerTag: {
     fontSize: 13,
     color: "#818384",
     marginLeft: "auto",
+  },
+  lobby: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    gap: 16,
+    padding: 32,
+  },
+  lobbyTitle: {
+    margin: 0,
+    fontSize: 24,
+    fontWeight: 700,
+  },
+  lobbySubtitle: {
+    margin: 0,
+    color: "#818384",
+    fontSize: 14,
+  },
+  lobbyHint: {
+    margin: 0,
+    color: "#3a3a3c",
+    fontSize: 12,
+    textAlign: "center",
   },
   main: {
     display: "flex",
@@ -309,6 +404,5 @@ const styles: Record<string, React.CSSProperties> = {
   },
   chatPlayer: {
     fontWeight: 700,
-    color: "#538d4e",
   },
 };
