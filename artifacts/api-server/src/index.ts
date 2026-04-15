@@ -1,3 +1,5 @@
+import http from "http";
+import { Server } from "socket.io";
 import app from "./app";
 import { logger } from "./lib/logger";
 
@@ -15,7 +17,28 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*" },
+});
+
+io.on("connection", (socket) => {
+  logger.info({ socketId: socket.id }, "Socket connected");
+
+  socket.on("guess", (data) => {
+    io.emit("guessUpdate", data);
+  });
+
+  socket.on("chat", (msg) => {
+    io.emit("chatMessage", msg);
+  });
+
+  socket.on("disconnect", () => {
+    logger.info({ socketId: socket.id }, "Socket disconnected");
+  });
+});
+
+server.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
