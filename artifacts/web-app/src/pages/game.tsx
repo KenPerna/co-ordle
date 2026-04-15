@@ -43,6 +43,10 @@ export default function Game() {
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
 
+    socket.on("gameState", (data: { guesses: GuessRow[] }) => {
+      setGuesses(data.guesses ?? []);
+    });
+
     socket.on("guessUpdate", (data: GuessRow) => {
       setGuesses((prev) => [...prev, data]);
     });
