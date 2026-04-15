@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
 
 const ROWS = 6;
@@ -62,6 +62,49 @@ function Board({ rounds, maxRows = ROWS, cols = COLS, showLetters = true, tileSi
           return <Tile key={`${ri}-${ci}`} letter={letter} color={color} size={tileSize} />;
         })
       )}
+    </div>
+  );
+}
+
+const KB_ROWS = ["QWERTYUIOP".split(""), "ASDFGHJKL".split(""), ["⌫", ..."ZXCVBNM".split(""), "↵"]];
+
+function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
+  letterStates: Record<string, TileColor>;
+  onKey: (l: string) => void;
+  onDelete: () => void;
+  onEnter: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center", width: "100%", marginTop: 10 }}>
+      {KB_ROWS.map((row, ri) => (
+        <div key={ri} style={{ display: "flex", gap: 5 }}>
+          {row.map((key) => {
+            const state: TileColor = letterStates[key.toLowerCase()] ?? "empty";
+            const isGray = state === "gray";
+            const isWide = key === "⌫" || key === "↵";
+            return (
+              <button
+                key={key}
+                disabled={disabled || isGray}
+                onClick={() => { if (key === "⌫") onDelete(); else if (key === "↵") onEnter(); else onKey(key); }}
+                style={{
+                  width: isWide ? 46 : 34, height: 46, borderRadius: 6, border: "none",
+                  background: state === "green" ? "#538d4e" : state === "yellow" ? "#b59f3b" : isGray ? "#1a1a1b" : "#3a3a3c",
+                  color: isGray ? "#3a3a3c" : "#fff",
+                  fontWeight: 700, fontSize: isWide ? 10 : 13,
+                  cursor: disabled || isGray ? "default" : "pointer",
+                  opacity: isGray ? 0.35 : 1,
+                  fontFamily: "inherit", flexShrink: 0,
+                  transition: "background 0.25s",
+                }}
+              >
+                {key}
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -375,6 +418,30 @@ export default function Game() {
   const guessCount = gameMode === "shared" ? sharedRounds.length : dualRounds.length;
   const isInputDisabled = gameStatus !== "playing" || (gameMode === "dual" && waitingForPartner);
 
+  // Letter color states for on-screen keyboard: green > yellow > gray
+  const letterStates = useMemo<Record<string, TileColor>>(() => {
+    const rows = gameMode === "shared" ? sharedBoardRows : myBoardRows;
+    const states: Record<string, TileColor> = {};
+    for (const row of rows) {
+      row.letters.forEach((letter, i) => {
+        const l = letter.toLowerCase();
+        const color = row.colors[i] ?? "empty";
+        const cur = states[l];
+        if (!cur || color === "green" || (color === "yellow" && cur === "gray")) states[l] = color;
+      });
+    }
+    return states;
+  }, [sharedBoardRows, myBoardRows, gameMode]);
+
+  const handleKeyPress = useCallback((letter: string) => {
+    if (isInputDisabled) return;
+    setCurrentGuess((prev) => prev.length < COLS ? prev + letter.toLowerCase() : prev);
+  }, [isInputDisabled]);
+
+  const handleBackspace = useCallback(() => {
+    setCurrentGuess((prev) => prev.slice(0, -1));
+  }, []);
+
   let statusText = "Guess the 5-letter word!";
   if (gameMode === "dual" && waitingForPartner) statusText = "Waiting for partner...";
   else if (gameMode === "dual" && partnerReady && !waitingForPartner) statusText = "Partner is ready — make your guess!";
@@ -484,12 +551,12 @@ export default function Game() {
             </div>
           )}
 
-          <div style={{ ...s.inputRow, marginTop: 20 }}>
+          <div style={{ ...s.inputRow, marginTop: 16 }}>
             <input
-              style={{ ...s.input, flex: 1, minWidth: 0, opacity: isInputDisabled ? 0.5 : 1 }}
-              value={currentGuess}
+              style={{ ...s.input, flex: 1, minWidth: 0, opacity: isInputDisabled ? 0.5 : 1, textTransform: "uppercase", letterSpacing: 4, fontWeight: 700 }}
+              value={currentGuess.toUpperCase()}
               maxLength={COLS}
-              placeholder={isInputDisabled ? (waitingForPartner ? "Waiting for partner..." : "Game over") : "5-letter word..."}
+              placeholder={isInputDisabled ? (waitingForPartner ? "Waiting for partner..." : "Game over") : "_ _ _ _ _"}
               disabled={isInputDisabled}
               onChange={(e) => handleTyping(e.target.value.toLowerCase().replace(/[^a-z]/g, ""))}
               onKeyDown={(e) => e.key === "Enter" && submitGuess()}
@@ -504,6 +571,14 @@ export default function Game() {
               Guess
             </button>
           </div>
+
+          <Keyboard
+            letterStates={letterStates}
+            onKey={handleKeyPress}
+            onDelete={handleBackspace}
+            onEnter={submitGuess}
+            disabled={isInputDisabled}
+          />
         </section>
 
         <section style={s.chatSection}>
