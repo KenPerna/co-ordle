@@ -36,6 +36,7 @@ interface Game {
   mode: "shared" | "dual";
   rounds: Round[];
   players: string[];
+  playerSockets: Map<string, string>; // playerName -> socketId
   usedWords: Set<string>;
   status: "playing" | "won" | "lost";
   winner?: string;
@@ -164,7 +165,7 @@ function applyTeamRewards(team: TeamData, base: ReturnType<typeof calcRewards>):
 function createGame(gameId: string, mode: "shared" | "dual"): Game {
   const word = pickSecretWord().toUpperCase();
   logger.info({ gameId, word, mode }, "Game created");
-  return { id: gameId, word, mode, rounds: [], players: [], usedWords: new Set(), status: "playing", startTime: Date.now() };
+  return { id: gameId, word, mode, rounds: [], players: [], playerSockets: new Map(), usedWords: new Set(), status: "playing", startTime: Date.now() };
 }
 
 function resetGame(game: Game): void {
@@ -266,10 +267,19 @@ function handleDualGuess(game: Game, playerId: string, guess: string): void {
   if (!allSubmitted) return;
 
   const [p1, p2] = activePlayers;
-  io.to(game.id).emit("roundResult", {
-    [p1]: { own: round.guesses[p1], other: { result: round.guesses[p2]?.result ?? [] } },
-    [p2]: { own: round.guesses[p2], other: { result: round.guesses[p1]?.result ?? [] } },
-  });
+
+  // DEBUG: log both guesses server-side (confirms separation)
+  logger.info({
+    gameId: game.id,
+    [p1]: round.guesses[p1].word,
+    [p2]: round.guesses[p2].word,
+  }, "Dual round resolved — sending player-specific payloads");
+
+  // Send each player ONLY their own guess + the other player's COLORS (no word)
+  const s1 = game.playerSockets.get(p1);
+  const s2 = game.playerSockets.get(p2);
+  if (s1) io.to(s1).emit("roundResult", { own: round.guesses[p1], other: { result: round.guesses[p2].result } });
+  if (s2) io.to(s2).emit("roundResult", { own: round.guesses[p2], other: { result: round.guesses[p1].result } });
 
   const p1Won = round.guesses[p1]?.result.every((r) => r === "green");
   const p2Won = round.guesses[p2]?.result.every((r) => r === "green");
@@ -302,6 +312,7 @@ io.on("connection", (socket) => {
 
     const game = getOrCreateGame(gameId, mode);
     if (!game.players.includes(player)) game.players.push(player);
+    game.playerSockets.set(player, socket.id); // track socket for targeted dual-mode emits
 
     const team = getOrCreateTeam(game.players);
 

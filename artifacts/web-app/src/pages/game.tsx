@@ -285,18 +285,18 @@ export default function Game() {
       setSharedRounds(rounds);
     });
 
-    socket.on("roundResult", (data: Record<string, { own: { word: string; result: string[] }; other: { result: string[] } }>) => {
+    socket.on("roundResult", (data: { own: { word: string; result: string[] }; other: { result: string[] } }) => {
+      // DEBUG: confirm we only received our own data (no partner word should be present)
+      console.log("[Dual] roundResult received — own word:", data.own.word, "| partner colors:", data.other.result);
       setWaitingForPartner(false);
       setPartnerReady(false);
-      const myData = data[playerName];
-      if (!myData) return;
       setDualRounds((prev) => {
         const next = [...prev];
         const last = next[next.length - 1];
         if (last?.waiting) {
-          next[next.length - 1] = { own: myData.own, partnerResult: myData.other.result };
+          next[next.length - 1] = { own: data.own, partnerResult: data.other.result };
         } else {
-          next.push({ own: myData.own, partnerResult: myData.other.result });
+          next.push({ own: data.own, partnerResult: data.other.result });
         }
         return next;
       });
