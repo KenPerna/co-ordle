@@ -172,6 +172,7 @@ function resetGame(game: Game): void {
   game.word = pickSecretWord().toUpperCase();
   game.rounds = [];
   game.usedWords = new Set();
+  // NOTE: playerSockets intentionally kept — socket IDs remain valid between rounds
   game.status = "playing";
   game.winner = undefined;
   game.startTime = Date.now();

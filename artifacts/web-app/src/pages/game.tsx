@@ -351,6 +351,8 @@ export default function Game() {
       setGameStatus("playing");
       setWinner(null);
       setRevealWord(null);
+      setRewards(null);
+      setCurrentGuess("");
       setWaitingForPartner(false);
       setPartnerReady(false);
       addSystem("New round started!");
@@ -513,7 +515,18 @@ export default function Game() {
           rewards={rewards}
           playerName={playerName}
           onLeave={leaveRoom}
-          onDismiss={() => setShowRewardScreen(false)}
+          onDismiss={() => {
+            setShowRewardScreen(false);
+            setSharedRounds([]);
+            setDualRounds([]);
+            setGameStatus("playing");
+            setWinner(null);
+            setRevealWord(null);
+            setRewards(null);
+            setCurrentGuess("");
+            setWaitingForPartner(false);
+            setPartnerReady(false);
+          }}
         />
       )}
 
