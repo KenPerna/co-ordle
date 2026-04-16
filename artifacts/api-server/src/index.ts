@@ -3,6 +3,7 @@ import { Server } from "socket.io";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { evaluateGuess, pickSecretWord } from "./game/wordEngine";
+import { upsertPlayer, getPlayer, updatePlayerStats, upsertTeamSession, getTeamSession } from "./db";
 
 const rawPort = process.env["PORT"];
 if (!rawPort) throw new Error("PORT environment variable is required but was not provided.");
@@ -35,15 +36,16 @@ interface Game {
   word: string;
   mode: "shared" | "dual";
   rounds: Round[];
-  players: string[];
-  playerSockets: Map<string, string>; // playerName -> socketId
+  players: string[];              // display names
+  playerIds: Map<string, string>; // displayName → UUID
+  playerSockets: Map<string, string>; // displayName → socketId
   usedWords: Set<string>;
   status: "playing" | "won" | "lost";
   winner?: string;
   startTime: number;
 }
 
-// ─── Team / token model ────────────────────────────────────────────────────────
+// ─── Team / token model (in-memory, source of truth is DB) ────────────────────
 
 interface TeamData {
   id: string;
@@ -51,7 +53,7 @@ interface TeamData {
   coins: number;
   streak: number;
   longestStreak: number;
-  lastPlayedDate: string; // "YYYY-MM-DD"
+  lastPlayedDate: string;
   gamesPlayedToday: number;
   lastGameDate: string;
 }
@@ -86,7 +88,6 @@ function getOrCreateTeam(players: string[]): TeamData {
 function calcRewards(game: Game, status: "won" | "lost", elapsedSeconds: number) {
   const guessesUsed = game.rounds.length;
 
-  // Almost-solved: any guess with 4+ green tiles
   let almostBonus = false;
   if (status === "lost") {
     outer: for (const round of game.rounds) {
@@ -100,7 +101,6 @@ function calcRewards(game: Game, status: "won" | "lost", elapsedSeconds: number)
     }
   }
 
-  // Great teamwork: both players contributed ≥2 rounds in dual mode
   let greatTeamwork = false;
   if (game.mode === "dual" && game.players.length >= 2) {
     const contribs = new Map<string, number>();
@@ -110,7 +110,6 @@ function calcRewards(game: Game, status: "won" | "lost", elapsedSeconds: number)
     greatTeamwork = game.players.slice(0, 2).every((p) => (contribs.get(p) ?? 0) >= 1);
   }
 
-  // Intelligence tokens
   let intelligence = 0;
   let coins = 0;
   if (status === "won") {
@@ -118,8 +117,8 @@ function calcRewards(game: Game, status: "won" | "lost", elapsedSeconds: number)
     if (elapsedSeconds < 60) intelligence += 5;
     else if (elapsedSeconds < 120) intelligence += 3;
     else if (elapsedSeconds < 180) intelligence += 1;
-    intelligence += Math.floor(Math.random() * 6); // 0–5 word difficulty bonus
-    if (greatTeamwork) intelligence += 5;           // teamwork bonus
+    intelligence += Math.floor(Math.random() * 6);
+    if (greatTeamwork) intelligence += 5;
     coins = 5;
   } else {
     intelligence = almostBonus ? 8 : 2;
@@ -133,8 +132,6 @@ function applyTeamRewards(team: TeamData, base: ReturnType<typeof calcRewards>):
   intelligence: number; coins: number; streakDays: number; dailyBonus: number; streakMultiplier: number;
 } {
   const today = todayStr();
-
-  // Streak update
   const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0]!;
   if (team.lastPlayedDate !== today) {
     if (team.lastPlayedDate === yesterday) team.streak++;
@@ -143,7 +140,6 @@ function applyTeamRewards(team: TeamData, base: ReturnType<typeof calcRewards>):
     if (team.streak > team.longestStreak) team.longestStreak = team.streak;
   }
 
-  // Daily game cap (anti-grind): full rewards for first 5 games/day
   if (team.lastGameDate !== today) { team.gamesPlayedToday = 0; team.lastGameDate = today; }
   team.gamesPlayedToday++;
   const capFactor = team.gamesPlayedToday <= 5 ? 1 : 0.25;
@@ -165,14 +161,14 @@ function applyTeamRewards(team: TeamData, base: ReturnType<typeof calcRewards>):
 function createGame(gameId: string, mode: "shared" | "dual"): Game {
   const word = pickSecretWord().toUpperCase();
   logger.info({ gameId, word, mode }, "Game created");
-  return { id: gameId, word, mode, rounds: [], players: [], playerSockets: new Map(), usedWords: new Set(), status: "playing", startTime: Date.now() };
+  return { id: gameId, word, mode, rounds: [], players: [], playerIds: new Map(), playerSockets: new Map(), usedWords: new Set(), status: "playing", startTime: Date.now() };
 }
 
 function resetGame(game: Game): void {
   game.word = pickSecretWord().toUpperCase();
   game.rounds = [];
   game.usedWords = new Set();
-  // NOTE: playerSockets intentionally kept — socket IDs remain valid between rounds
+  // playerIds + playerSockets intentionally kept — valid between rounds
   game.status = "playing";
   game.winner = undefined;
   game.startTime = Date.now();
@@ -194,13 +190,54 @@ function playerView(game: Game, playerId: string): object[] {
   });
 }
 
-function emitGameOver(game: Game, status: "won" | "lost", winner?: string): void {
+async function emitGameOver(game: Game, status: "won" | "lost", winner?: string): Promise<void> {
   const elapsedSeconds = Math.floor((Date.now() - game.startTime) / 1000);
   const base = calcRewards(game, status, elapsedSeconds);
   const team = getOrCreateTeam(game.players);
   const applied = applyTeamRewards(team, base);
+  const won = status === "won";
 
-  io.to(game.id).emit("gameOver", {
+  // Persist stats to DB for each player + team session
+  const [p1Name, p2Name] = game.players.slice(0, 2);
+  const p1Id = p1Name ? game.playerIds.get(p1Name) : undefined;
+  const p2Id = p2Name ? game.playerIds.get(p2Name) : undefined;
+
+  // Update both players in DB (fire & forget, non-blocking)
+  const dbUpdates: Promise<unknown>[] = [];
+  if (p1Id) dbUpdates.push(updatePlayerStats(p1Id, applied.intelligence, applied.coins, won).catch((e) => logger.error({ e }, "DB update p1 failed")));
+  if (p2Id) dbUpdates.push(updatePlayerStats(p2Id, applied.intelligence, applied.coins, won).catch((e) => logger.error({ e }, "DB update p2 failed")));
+  if (p1Id && p2Id) dbUpdates.push(upsertTeamSession(p1Id, p2Id, applied.intelligence, applied.coins, won).catch((e) => logger.error({ e }, "DB team session failed")));
+
+  // Wait for DB writes so we can include fresh totals in the payload
+  await Promise.allSettled(dbUpdates);
+
+  // Fetch updated stats for both players and the team session
+  const [p1Row, p2Row, teamSession] = await Promise.all([
+    p1Id ? getPlayer(p1Id).catch(() => null) : null,
+    p2Id ? getPlayer(p2Id).catch(() => null) : null,
+    (p1Id && p2Id) ? getTeamSession(p1Id, p2Id).catch(() => null) : null,
+  ]);
+
+  const makePlayerStats = (row: typeof p1Row, name: string | undefined) => row ? {
+    displayName: row.display_name,
+    intelligence: row.intelligence,
+    coins: row.coins,
+    gamesPlayed: row.games_played,
+    gamesWon: row.games_won,
+    winRate: row.games_played > 0 ? Math.round((row.games_won / row.games_played) * 100) : 0,
+    currentStreak: row.current_streak,
+    bestStreak: row.best_streak,
+  } : null;
+
+  const teamStats = teamSession ? {
+    gamesPlayed: teamSession.games_played,
+    gamesWon: teamSession.games_won,
+    winRate: teamSession.games_played > 0 ? Math.round((teamSession.games_won / teamSession.games_played) * 100) : 0,
+    intelligenceEarned: teamSession.intelligence_earned,
+    coinsEarned: teamSession.coins_earned,
+  } : null;
+
+  const basePayload = {
     status,
     winner: winner ?? null,
     word: game.word,
@@ -217,7 +254,22 @@ function emitGameOver(game: Game, status: "won" | "lost", winner?: string): void
       guessesUsed: base.guessesUsed,
       teamTotal: { intelligence: team.intelligence, coins: team.coins },
     },
-  });
+    teamStats,
+  };
+
+  // Send each player their own stats + partner's name (no sensitive partner data)
+  const s1 = p1Name ? game.playerSockets.get(p1Name) : undefined;
+  const s2 = p2Name ? game.playerSockets.get(p2Name) : undefined;
+
+  const p1Stats = makePlayerStats(p1Row, p1Name);
+  const p2Stats = makePlayerStats(p2Row, p2Name);
+
+  if (s1) io.to(s1).emit("gameOver", { ...basePayload, playerStats: p1Stats, partnerStats: p2Stats });
+  if (s2) io.to(s2).emit("gameOver", { ...basePayload, playerStats: p2Stats, partnerStats: p1Stats });
+
+  // Fallback: broadcast to anyone not in playerSockets (e.g. spectators or single player)
+  const knownSockets = new Set([s1, s2].filter(Boolean));
+  io.to(game.id).except([...knownSockets]).emit("gameOver", basePayload);
 }
 
 // ─── Guess handlers ─────────────────────────────────────────────────────────────
@@ -269,14 +321,8 @@ function handleDualGuess(game: Game, playerId: string, guess: string): void {
 
   const [p1, p2] = activePlayers;
 
-  // DEBUG: log both guesses server-side (confirms separation)
-  logger.info({
-    gameId: game.id,
-    [p1]: round.guesses[p1].word,
-    [p2]: round.guesses[p2].word,
-  }, "Dual round resolved — sending player-specific payloads");
+  logger.info({ gameId: game.id, [p1]: round.guesses[p1].word, [p2]: round.guesses[p2].word }, "Dual round resolved");
 
-  // Send each player ONLY their own guess + the other player's COLORS (no word)
   const s1 = game.playerSockets.get(p1);
   const s2 = game.playerSockets.get(p2);
   if (s1) io.to(s1).emit("roundResult", { own: round.guesses[p1], other: { result: round.guesses[p2].result } });
@@ -305,7 +351,9 @@ io.on("connection", (socket) => {
   let currentRoom: string | null = null;
   let currentPlayer: string | null = null;
 
-  socket.on("joinRoom", ({ gameId, player, mode = "shared" }: { gameId: string; player: string; mode?: "shared" | "dual" }) => {
+  socket.on("joinRoom", async ({ gameId, player, playerId, mode = "shared" }: {
+    gameId: string; player: string; playerId?: string; mode?: "shared" | "dual";
+  }) => {
     if (currentRoom) socket.leave(currentRoom);
     currentRoom = gameId;
     currentPlayer = player;
@@ -313,9 +361,33 @@ io.on("connection", (socket) => {
 
     const game = getOrCreateGame(gameId, mode);
     if (!game.players.includes(player)) game.players.push(player);
-    game.playerSockets.set(player, socket.id); // track socket for targeted dual-mode emits
+    game.playerSockets.set(player, socket.id);
+    if (playerId) game.playerIds.set(player, playerId);
 
     const team = getOrCreateTeam(game.players);
+
+    // Upsert player in DB and fetch their stats
+    let playerStats = null;
+    if (playerId) {
+      try {
+        await upsertPlayer(playerId, player);
+        const row = await getPlayer(playerId);
+        if (row) {
+          playerStats = {
+            displayName: row.display_name,
+            intelligence: row.intelligence,
+            coins: row.coins,
+            gamesPlayed: row.games_played,
+            gamesWon: row.games_won,
+            winRate: row.games_played > 0 ? Math.round((row.games_won / row.games_played) * 100) : 0,
+            currentStreak: row.current_streak,
+            bestStreak: row.best_streak,
+          };
+        }
+      } catch (e) {
+        logger.error({ e }, "Failed to load player stats from DB");
+      }
+    }
 
     socket.emit("gameState", {
       mode: game.mode,
@@ -324,10 +396,11 @@ io.on("connection", (socket) => {
       winner: game.winner,
       players: game.players,
       teamTotal: { intelligence: team.intelligence, coins: team.coins, streak: team.streak },
+      playerStats,
     });
 
     io.to(gameId).emit("playerJoined", { player, players: game.players });
-    logger.info({ socketId: socket.id, gameId, player, mode: game.mode }, "Player joined");
+    logger.info({ socketId: socket.id, gameId, player, playerId, mode: game.mode }, "Player joined");
   });
 
   socket.on("guess", ({ gameId, playerId, guess }: { gameId: string; playerId: string; guess: string }) => {

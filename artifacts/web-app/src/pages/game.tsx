@@ -23,6 +23,40 @@ interface RewardInfo {
   guessesUsed: number;
   teamTotal: { intelligence: number; coins: number };
 }
+interface PlayerStats {
+  displayName: string;
+  intelligence: number;
+  coins: number;
+  gamesPlayed: number;
+  gamesWon: number;
+  winRate: number;
+  currentStreak: number;
+  bestStreak: number;
+}
+interface TeamSessionStats {
+  gamesPlayed: number;
+  gamesWon: number;
+  winRate: number;
+  intelligenceEarned: number;
+  coinsEarned: number;
+}
+
+// ─── UUID helper ──────────────────────────────────────────────────────────────
+function getOrCreatePlayerId(): string {
+  const key = "coOrdle_playerId";
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+function getStoredPlayerName(): string {
+  return localStorage.getItem("coOrdle_playerName") ?? "";
+}
+function savePlayerName(name: string): void {
+  localStorage.setItem("coOrdle_playerName", name);
+}
 
 const TILE_BG: Record<TileColor, string> = {
   green: "#538d4e", yellow: "#b59f3b", gray: "#3a3a3c", empty: "#121213", pending: "#2a2a2c",
@@ -109,9 +143,54 @@ function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
   );
 }
 
-function RewardScreen({ status, winner, revealWord, rewards, playerName, onLeave, onDismiss }: {
+function PlayerStatCard({ stats, label }: { stats: PlayerStats; label: string }) {
+  return (
+    <div style={{ background: "#1a1a1b", borderRadius: 10, padding: "12px 14px", marginTop: 10 }}>
+      <div style={{ fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+        <MiniStat label="Games" value={String(stats.gamesPlayed)} />
+        <MiniStat label="Win %" value={`${stats.winRate}%`} accent="#538d4e" />
+        <MiniStat label="🧠" value={String(stats.intelligence)} accent="#538d4e" />
+        <MiniStat label="🪙" value={String(stats.coins)} accent="#b59f3b" />
+        <MiniStat label="Streak" value={`${stats.currentStreak}d`} accent="#f97316" />
+        <MiniStat label="Best" value={`${stats.bestStreak}d`} />
+        <MiniStat label="Wins" value={String(stats.gamesWon)} accent="#538d4e" />
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, accent = "#fff" }: { label: string; value: string; accent?: string }) {
+  return (
+    <div style={{ textAlign: "center", background: "#121213", borderRadius: 6, padding: "6px 4px" }}>
+      <div style={{ fontSize: 10, color: "#818384", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: accent, marginTop: 1 }}>{value}</div>
+    </div>
+  );
+}
+
+function TeamSessionCard({ stats, p1Name, p2Name }: { stats: TeamSessionStats; p1Name: string; p2Name: string }) {
+  return (
+    <div style={{ background: "#1a1a1b", borderRadius: 10, padding: "12px 14px", marginTop: 10 }}>
+      <div style={{ fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8 }}>
+        Team History · {p1Name} & {p2Name}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+        <MiniStat label="Games" value={String(stats.gamesPlayed)} />
+        <MiniStat label="Win %" value={`${stats.winRate}%`} accent="#538d4e" />
+        <MiniStat label="🧠 Earned" value={String(stats.intelligenceEarned)} accent="#538d4e" />
+        <MiniStat label="🪙 Earned" value={String(stats.coinsEarned)} accent="#b59f3b" />
+      </div>
+    </div>
+  );
+}
+
+function RewardScreen({ status, winner, revealWord, rewards, playerName, partnerName, playerStats, partnerStats, teamStats, onLeave, onDismiss }: {
   status: GameStatus; winner: string | null; revealWord: string | null;
-  rewards: RewardInfo | null; playerName: string; onLeave: () => void; onDismiss: () => void;
+  rewards: RewardInfo | null; playerName: string; partnerName: string | null;
+  playerStats: PlayerStats | null; partnerStats: PlayerStats | null;
+  teamStats: TeamSessionStats | null;
+  onLeave: () => void; onDismiss: () => void;
 }) {
   const won = status === "won";
   const isWinner = winner === playerName;
@@ -193,6 +272,17 @@ function RewardScreen({ status, winner, revealWord, rewards, playerName, onLeave
           </div>
         )}
 
+        {/* Player career stats */}
+        {playerStats && <PlayerStatCard stats={playerStats} label="Your Career Stats" />}
+
+        {/* Partner career stats */}
+        {partnerStats && <PlayerStatCard stats={partnerStats} label={`${partnerStats.displayName}'s Career Stats`} />}
+
+        {/* Team session history */}
+        {teamStats && partnerStats && (
+          <TeamSessionCard stats={teamStats} p1Name={playerName} p2Name={partnerStats.displayName} />
+        )}
+
         {/* Actions */}
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <div style={{ ...s.btn, flex: 1, textAlign: "center", background: "#1a1a1b", border: "1px solid #3a3a3c", cursor: "pointer", color: "#818384", fontSize: 14 }}
@@ -234,7 +324,11 @@ function TokenRow({ icon, label, earned, total, color }: { icon: string; label: 
 }
 
 export default function Game() {
-  const [playerName] = useState(() => `Player${Math.floor(Math.random() * 900 + 100)}`);
+  // ── Persistent identity ──────────────────────────────────────────────────────
+  const [playerId] = useState(() => getOrCreatePlayerId());
+  const [nameInput, setNameInput] = useState(() => getStoredPlayerName());
+  const [playerName, setPlayerName] = useState(() => getStoredPlayerName() || `Player${Math.floor(Math.random() * 900 + 100)}`);
+
   const [roomInput, setRoomInput] = useState("");
   const [modeInput, setModeInput] = useState<GameMode>("shared");
   const [inRoom, setInRoom] = useState(false);
@@ -253,6 +347,11 @@ export default function Game() {
   const [revealWord, setRevealWord] = useState<string | null>(null);
   const [rewards, setRewards] = useState<RewardInfo | null>(null);
   const [showRewardScreen, setShowRewardScreen] = useState(false);
+
+  // ── Player / team stats from DB ──────────────────────────────────────────────
+  const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
+  const [partnerStats, setPartnerStats] = useState<PlayerStats | null>(null);
+  const [teamStats, setTeamStats] = useState<TeamSessionStats | null>(null);
 
   const [currentGuess, setCurrentGuess] = useState("");
   const [wordError, setWordError] = useState<string | null>(null);
@@ -275,12 +374,13 @@ export default function Game() {
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
 
-    socket.on("gameState", ({ mode, rounds, status, winner: w, players: ps, teamTotal: tt }: any) => {
+    socket.on("gameState", ({ mode, rounds, status, winner: w, players: ps, teamTotal: tt, playerStats: ps2 }: any) => {
       setGameMode(mode);
       setPlayers(ps ?? []);
       setGameStatus(status ?? "playing");
       setWinner(w ?? null);
       if (tt) setTeamTotal(tt);
+      if (ps2) setPlayerStats(ps2);
       if (mode === "shared") setSharedRounds(rounds ?? []);
       else setDualRounds(rounds ?? []);
     });
@@ -334,8 +434,9 @@ export default function Game() {
       setTimeout(() => setWordError(null), 3000);
     });
 
-    socket.on("gameOver", ({ status, winner: w, word, rewards: r }: {
+    socket.on("gameOver", ({ status, winner: w, word, rewards: r, playerStats: ps, partnerStats: pts, teamStats: ts }: {
       status: GameStatus; winner?: string; word: string; rewards?: RewardInfo;
+      playerStats?: PlayerStats; partnerStats?: PlayerStats; teamStats?: TeamSessionStats;
     }) => {
       setGameStatus(status);
       setWinner(w ?? null);
@@ -343,6 +444,9 @@ export default function Game() {
       setRewards(r ?? null);
       setShowRewardScreen(true);
       if (r?.teamTotal) setTeamTotal((prev) => ({ ...prev, intelligence: r.teamTotal.intelligence, coins: r.teamTotal.coins }));
+      if (ps) setPlayerStats(ps);
+      if (pts) setPartnerStats(pts);
+      if (ts) setTeamStats(ts);
     });
 
     socket.on("newRound", () => {
@@ -368,6 +472,15 @@ export default function Game() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, typingPlayers]);
 
+  // Load career stats on mount so lobby shows them immediately
+  useEffect(() => {
+    const name = encodeURIComponent(playerName);
+    fetch(`${import.meta.env.BASE_URL}api/players/${playerId}?name=${name}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setPlayerStats(data); })
+      .catch(() => {});
+  }, [playerId, playerName]);
+
   const joinRoom = useCallback(() => {
     const id = roomInput.trim();
     if (!id || !socketRef.current) return;
@@ -381,8 +494,15 @@ export default function Game() {
     setWinner(null);
     setRevealWord(null);
     setRewards(null);
-    socketRef.current.emit("joinRoom", { gameId: id, player: playerName, mode: modeInput });
-  }, [roomInput, modeInput, playerName]);
+    setPartnerStats(null);
+    setTeamStats(null);
+    const confirmedName = nameInput.trim() || playerName;
+    if (confirmedName !== playerName) {
+      savePlayerName(confirmedName);
+      setPlayerName(confirmedName);
+    }
+    socketRef.current.emit("joinRoom", { gameId: id, player: confirmedName, playerId, mode: modeInput });
+  }, [roomInput, modeInput, nameInput, playerName, playerId]);
 
   const leaveRoom = useCallback(() => {
     setInRoom(false);
@@ -468,15 +588,38 @@ export default function Game() {
         </header>
         <div style={s.lobby}>
           <h2 style={s.lobbyTitle}>Join a Game Room</h2>
-          <input
-            style={{ ...s.input, width: "100%", maxWidth: 340, marginBottom: 12 }}
-            value={roomInput}
-            placeholder="Room name (share to invite friends)"
-            onChange={(e) => setRoomInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && joinRoom()}
-            data-testid="input-room"
-            autoFocus
-          />
+
+          {/* Player name */}
+          <div style={{ width: "100%", maxWidth: 340, marginBottom: 12 }}>
+            <label style={{ fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1, display: "block", marginBottom: 4 }}>
+              Your Name
+            </label>
+            <input
+              style={{ ...s.input, width: "100%" }}
+              value={nameInput}
+              placeholder="Enter your display name"
+              onChange={(e) => setNameInput(e.target.value)}
+              onBlur={() => { if (nameInput.trim()) { savePlayerName(nameInput.trim()); setPlayerName(nameInput.trim()); }}}
+              data-testid="input-name"
+            />
+          </div>
+
+          {/* Room name */}
+          <div style={{ width: "100%", maxWidth: 340, marginBottom: 12 }}>
+            <label style={{ fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1, display: "block", marginBottom: 4 }}>
+              Room Name
+            </label>
+            <input
+              style={{ ...s.input, width: "100%" }}
+              value={roomInput}
+              placeholder="Share with your partner to play together"
+              onChange={(e) => setRoomInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && joinRoom()}
+              data-testid="input-room"
+              autoFocus
+            />
+          </div>
+
           <select
             style={{ ...s.input, width: "100%", maxWidth: 340, marginBottom: 8, cursor: "pointer" }}
             value={modeInput}
@@ -494,9 +637,13 @@ export default function Game() {
           <button style={{ ...s.btn, width: "100%", maxWidth: 340, fontSize: 17, padding: "14px 0" }} onClick={joinRoom} data-testid="button-join">
             Join Room
           </button>
-          <p style={{ color: "#3a3a3c", fontSize: 12, marginTop: 12 }}>
-            Share the room name with your partner to play together
-          </p>
+
+          {/* Career stats preview */}
+          {playerStats && (
+            <div style={{ width: "100%", maxWidth: 340, marginTop: 20 }}>
+              <PlayerStatCard stats={playerStats} label="Your Career Stats" />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -514,6 +661,10 @@ export default function Game() {
           revealWord={revealWord}
           rewards={rewards}
           playerName={playerName}
+          partnerName={players.find((p) => p !== playerName) ?? null}
+          playerStats={playerStats}
+          partnerStats={partnerStats}
+          teamStats={teamStats}
           onLeave={leaveRoom}
           onDismiss={() => {
             setShowRewardScreen(false);
