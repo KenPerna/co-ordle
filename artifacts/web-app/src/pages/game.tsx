@@ -143,7 +143,6 @@ function RewardScreen({ status, winner, revealWord, rewards, playerName, onLeave
               <div style={{ fontSize: 32, fontWeight: 900, color: "#fff" }}>
                 The word was <span style={{ color: "#b59f3b" }}>{revealWord}</span>
               </div>
-              <div style={{ fontSize: 14, color: "#818384", marginTop: 6 }}>So close — you'll get it next round.</div>
             </>
           )}
         </div>
