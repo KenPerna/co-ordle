@@ -346,17 +346,17 @@ export default function Game() {
     });
 
     socket.on("newRound", () => {
+      // Reset board state for the new round, but intentionally leave
+      // revealWord, rewards, and showRewardScreen untouched so the end-game
+      // screen stays fully intact until the player dismisses it themselves.
       setSharedRounds([]);
       setDualRounds([]);
       setGameStatus("playing");
       setWinner(null);
-      setRevealWord(null);
-      setRewards(null);
       setCurrentGuess("");
       setWaitingForPartner(false);
       setPartnerReady(false);
       addSystem("New round started!");
-      // NOTE: do NOT clear showRewardScreen here — player must dismiss manually
     });
 
     socket.on("chatMessage", (msg: ChatMsg) => setChatMessages((prev) => [...prev, msg]));
