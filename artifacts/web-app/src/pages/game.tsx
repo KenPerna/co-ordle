@@ -140,11 +140,16 @@ function RewardScreen({ status, winner, revealWord, rewards, playerName, onLeave
           ) : (
             <>
               <div style={{ fontSize: 13, letterSpacing: 3, color: "#538d4e", textTransform: "uppercase", marginBottom: 4 }}>Great Teamwork!</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#fff" }}>
-                The word was <span style={{ color: "#b59f3b" }}>{revealWord}</span>
-              </div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "#fff" }}>Almost!</div>
             </>
           )}
+          {/* Always show the secret word */}
+          <div style={{ marginTop: 10, fontSize: 14, color: "#818384" }}>
+            The word was{" "}
+            <span style={{ color: "#b59f3b", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
+              {revealWord}
+            </span>
+          </div>
         </div>
 
         {/* Stats row */}
