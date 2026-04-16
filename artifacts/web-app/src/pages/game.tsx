@@ -16,6 +16,7 @@ interface RewardInfo {
   coins: number;
   almostBonus: boolean;
   greatTeamwork: boolean;
+  bountyApplied: boolean;
   streakDays: number;
   dailyBonus: number;
   streakMultiplier: number;
@@ -120,15 +121,15 @@ function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
             return (
               <button
                 key={key}
-                disabled={disabled || isGray}
+                disabled={disabled}
                 onClick={() => { if (key === "⌫") onDelete(); else if (key === "↵") onEnter(); else onKey(key); }}
                 style={{
                   width: isWide ? 46 : 34, height: 46, borderRadius: 6, border: "none",
                   background: state === "green" ? "#538d4e" : state === "yellow" ? "#b59f3b" : isGray ? "#1a1a1b" : "#3a3a3c",
-                  color: isGray ? "#3a3a3c" : "#fff",
+                  color: isGray ? "#555" : "#fff",
                   fontWeight: 700, fontSize: isWide ? 10 : 13,
-                  cursor: disabled || isGray ? "default" : "pointer",
-                  opacity: isGray ? 0.35 : 1,
+                  cursor: disabled ? "default" : "pointer",
+                  opacity: isGray ? 0.5 : 1,
                   fontFamily: "inherit", flexShrink: 0,
                   transition: "background 0.25s",
                 }}
@@ -185,41 +186,61 @@ function TeamSessionCard({ stats, p1Name, p2Name }: { stats: TeamSessionStats; p
   );
 }
 
-function RewardScreen({ status, winner, revealWord, rewards, playerName, partnerName, playerStats, partnerStats, teamStats, onLeave, onDismiss }: {
-  status: GameStatus; winner: string | null; revealWord: string | null;
+function RewardScreen({ status, revealWord, rewards, playerName, partnerName, playerStats, partnerStats, teamStats, bountyNextRound, onLeave, onDismiss }: {
+  status: GameStatus; revealWord: string | null;
   rewards: RewardInfo | null; playerName: string; partnerName: string | null;
   playerStats: PlayerStats | null; partnerStats: PlayerStats | null;
   teamStats: TeamSessionStats | null;
+  bountyNextRound: boolean;
   onLeave: () => void; onDismiss: () => void;
 }) {
   const won = status === "won";
-  const isWinner = winner === playerName;
+  const hasPartner = !!partnerName;
 
   return (
     <div style={s.overlay}>
       <style>{`
         @keyframes rise { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+        @keyframes glow { 0%,100%{box-shadow:0 0 8px #7c3aed} 50%{box-shadow:0 0 22px #a855f7,0 0 8px #7c3aed} }
         .result-card { animation: rise 0.4s ease; }
         .reward-row { animation: rise 0.5s ease 0.15s both; }
+        .bounty-btn { animation: glow 1.8s ease-in-out infinite; }
       `}</style>
       <div style={s.resultCard} className="result-card">
         {/* Title */}
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           {won ? (
             <>
-              <div style={{ fontSize: 13, letterSpacing: 3, color: "#538d4e", textTransform: "uppercase", marginBottom: 4 }}>Puzzle Solved!</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff", animation: "pulse 1.2s ease-in-out infinite" }}>
-                {isWinner ? "YOU WON!" : `${winner} WON!`}
+              <div style={{ fontSize: 40, marginBottom: 4 }}>🎉</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "#538d4e", animation: "pulse 1.2s ease-in-out infinite" }}>
+                Puzzle Solved!
               </div>
-              <div style={{ fontSize: 14, color: "#818384", marginTop: 4 }}>
-                {isWinner ? "Excellent teamwork!" : "Better luck next round."}
+              {rewards?.greatTeamwork && (
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#93c5fd", marginTop: 6 }}>
+                  🤝 Great Teamwork!
+                </div>
+              )}
+              {rewards?.bountyApplied && (
+                <div style={{ fontSize: 13, color: "#f97316", fontWeight: 700, marginTop: 4, letterSpacing: 1 }}>
+                  🎯 BOUNTY CASHED — 2× REWARDS EARNED!
+                </div>
+              )}
+              <div style={{ fontSize: 14, color: "#818384", marginTop: 6 }}>
+                {hasPartner ? "You solved it together — incredible!" : "You cracked it — well done!"}
               </div>
             </>
           ) : (
             <>
-              <div style={{ fontSize: 13, letterSpacing: 3, color: "#538d4e", textTransform: "uppercase", marginBottom: 4 }}>Great Teamwork!</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#fff" }}>Almost!</div>
+              <div style={{ fontSize: 40, marginBottom: 4 }}>💪</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "#fff" }}>
+                So Close!
+              </div>
+              <div style={{ fontSize: 14, color: "#818384", marginTop: 6 }}>
+                {rewards?.greatTeamwork
+                  ? "Amazing effort from both of you — keep it up!"
+                  : "You'll crack the next one — don't give up!"}
+              </div>
             </>
           )}
           {/* Always show the secret word */}
@@ -242,20 +263,20 @@ function RewardScreen({ status, winner, revealWord, rewards, playerName, partner
           </div>
         )}
 
-        {/* Special messages */}
+        {/* Bonus banners */}
         {rewards?.almostBonus && (
           <div style={s.bonusBanner}>
-            You were ONE letter away! <span style={{ color: "#538d4e" }}>+8 Intelligence</span>
+            🔥 One letter away! <span style={{ color: "#538d4e" }}>+8 Intelligence bonus</span>
           </div>
         )}
-        {rewards?.greatTeamwork && (
+        {rewards?.greatTeamwork && won && (
           <div style={{ ...s.bonusBanner, borderColor: "#3b82f6", color: "#93c5fd" }}>
-            Great teamwork! Both players contributed this round.
+            🤝 Both players contributed <span style={{ color: "#93c5fd", fontWeight: 700 }}>+5 Intelligence & +3 Coins</span> teamwork bonus!
           </div>
         )}
         {rewards?.dailyBonus ? (
           <div style={{ ...s.bonusBanner, borderColor: "#f97316", color: "#fdba74" }}>
-            Daily bonus: <span style={{ fontWeight: 700 }}>+3 coins</span> for playing today!
+            ☀️ Daily bonus: <span style={{ fontWeight: 700 }}>+{rewards.dailyBonus} coins</span> for playing today!
           </div>
         ) : null}
 
@@ -266,9 +287,18 @@ function RewardScreen({ status, winner, revealWord, rewards, playerName, partner
             <TokenRow icon="🪙" label="Coins" earned={rewards.coins} total={rewards.teamTotal.coins} color="#b59f3b" />
             {rewards.streakMultiplier > 1 && (
               <div style={{ fontSize: 12, color: "#818384", textAlign: "center", marginTop: 4 }}>
-                {rewards.streakMultiplier.toFixed(1)}x streak multiplier applied
+                {rewards.streakMultiplier.toFixed(1)}× streak multiplier applied
               </div>
             )}
+          </div>
+        )}
+
+        {/* Bounty teaser on loss */}
+        {!won && bountyNextRound && (
+          <div style={{ background: "linear-gradient(135deg,#3b1e6e,#1e1240)", border: "1px solid #7c3aed", borderRadius: 10, padding: "12px 14px", marginTop: 10, textAlign: "center" }}>
+            <div style={{ fontSize: 18, marginBottom: 4 }}>🎯 Bounty Activated!</div>
+            <div style={{ fontSize: 13, color: "#c4b5fd" }}>Win the next round to earn <strong style={{ color: "#e9d5ff" }}>2× Intelligence & Coins</strong>.</div>
+            <div style={{ fontSize: 12, color: "#7c3aed", marginTop: 4 }}>Bounty stays active until you win.</div>
           </div>
         )}
 
@@ -289,10 +319,21 @@ function RewardScreen({ status, winner, revealWord, rewards, playerName, partner
             onClick={onLeave}>
             Leave Room
           </div>
-          <div style={{ ...s.btn, flex: 1, textAlign: "center", cursor: "pointer", fontSize: 15 }}
-            onClick={onDismiss}>
-            Play Next Round
-          </div>
+          {!won && bountyNextRound ? (
+            <div
+              style={{ ...s.btn, flex: 1, textAlign: "center", cursor: "pointer", fontSize: 13, background: "#4c1d95", border: "1px solid #7c3aed", borderRadius: 10, padding: "14px 8px", fontWeight: 700 }}
+              className="bounty-btn"
+              onClick={onDismiss}
+            >
+              Play Next Round<br />
+              <span style={{ fontSize: 11, color: "#c4b5fd", fontWeight: 400 }}>🎯 2× Bonus if you win!</span>
+            </div>
+          ) : (
+            <div style={{ ...s.btn, flex: 1, textAlign: "center", cursor: "pointer", fontSize: 15 }}
+              onClick={onDismiss}>
+              Play Next Round
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -352,6 +393,7 @@ export default function Game() {
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
   const [partnerStats, setPartnerStats] = useState<PlayerStats | null>(null);
   const [teamStats, setTeamStats] = useState<TeamSessionStats | null>(null);
+  const [bountyNextRound, setBountyNextRound] = useState(false);
 
   const [currentGuess, setCurrentGuess] = useState("");
   const [wordError, setWordError] = useState<string | null>(null);
@@ -434,8 +476,9 @@ export default function Game() {
       setTimeout(() => setWordError(null), 3000);
     });
 
-    socket.on("gameOver", ({ status, winner: w, word, rewards: r, playerStats: ps, partnerStats: pts, teamStats: ts }: {
+    socket.on("gameOver", ({ status, winner: w, word, rewards: r, bountyNextRound: bnr, playerStats: ps, partnerStats: pts, teamStats: ts }: {
       status: GameStatus; winner?: string; word: string; rewards?: RewardInfo;
+      bountyNextRound?: boolean;
       playerStats?: PlayerStats; partnerStats?: PlayerStats; teamStats?: TeamSessionStats;
     }) => {
       setGameStatus(status);
@@ -443,6 +486,7 @@ export default function Game() {
       setRevealWord(word);
       setRewards(r ?? null);
       setShowRewardScreen(true);
+      setBountyNextRound(bnr ?? false);
       if (r?.teamTotal) setTeamTotal((prev) => ({ ...prev, intelligence: r.teamTotal.intelligence, coins: r.teamTotal.coins }));
       if (ps) setPlayerStats(ps);
       if (pts) setPartnerStats(pts);
@@ -657,7 +701,6 @@ export default function Game() {
       {showRewardScreen && (
         <RewardScreen
           status={gameStatus}
-          winner={winner}
           revealWord={revealWord}
           rewards={rewards}
           playerName={playerName}
@@ -665,6 +708,7 @@ export default function Game() {
           playerStats={playerStats}
           partnerStats={partnerStats}
           teamStats={teamStats}
+          bountyNextRound={bountyNextRound}
           onLeave={leaveRoom}
           onDismiss={() => {
             setShowRewardScreen(false);

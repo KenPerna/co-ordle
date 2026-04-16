@@ -43,6 +43,7 @@ interface Game {
   status: "playing" | "won" | "lost";
   winner?: string;
   startTime: number;
+  bountyActive: boolean; // true after a loss — next win earns 2× rewards
 }
 
 // ─── Team / token model (in-memory, source of truth is DB) ────────────────────
@@ -101,13 +102,18 @@ function calcRewards(game: Game, status: "won" | "lost", elapsedSeconds: number)
     }
   }
 
+  // True if both players contributed at least one guess (works for both modes)
   let greatTeamwork = false;
-  if (game.mode === "dual" && game.players.length >= 2) {
-    const contribs = new Map<string, number>();
-    for (const round of game.rounds as DualRound[]) {
-      for (const pid of Object.keys(round.guesses)) contribs.set(pid, (contribs.get(pid) ?? 0) + 1);
+  if (game.players.length >= 2) {
+    const contributors = new Set<string>();
+    for (const round of game.rounds) {
+      if (round.type === "shared") {
+        contributors.add((round as SharedRound).player);
+      } else {
+        for (const pid of Object.keys((round as DualRound).guesses)) contributors.add(pid);
+      }
     }
-    greatTeamwork = game.players.slice(0, 2).every((p) => (contribs.get(p) ?? 0) >= 1);
+    greatTeamwork = contributors.size >= 2;
   }
 
   let intelligence = 0;
@@ -118,11 +124,10 @@ function calcRewards(game: Game, status: "won" | "lost", elapsedSeconds: number)
     else if (elapsedSeconds < 120) intelligence += 3;
     else if (elapsedSeconds < 180) intelligence += 1;
     intelligence += Math.floor(Math.random() * 6);
-    if (greatTeamwork) intelligence += 5;
-    coins = 5;
+    if (greatTeamwork) { intelligence += 5; coins = 8; } else { coins = 5; }
   } else {
     intelligence = almostBonus ? 8 : 2;
-    coins = 2;
+    coins = almostBonus ? 4 : 2;
   }
 
   return { intelligence, coins, almostBonus, greatTeamwork, elapsedSeconds, guessesUsed };
@@ -161,7 +166,7 @@ function applyTeamRewards(team: TeamData, base: ReturnType<typeof calcRewards>):
 function createGame(gameId: string, mode: "shared" | "dual"): Game {
   const word = pickSecretWord().toUpperCase();
   logger.info({ gameId, word, mode }, "Game created");
-  return { id: gameId, word, mode, rounds: [], players: [], playerIds: new Map(), playerSockets: new Map(), usedWords: new Set(), status: "playing", startTime: Date.now() };
+  return { id: gameId, word, mode, rounds: [], players: [], playerIds: new Map(), playerSockets: new Map(), usedWords: new Set(), status: "playing", startTime: Date.now(), bountyActive: false };
 }
 
 function resetGame(game: Game): void {
@@ -169,10 +174,11 @@ function resetGame(game: Game): void {
   game.rounds = [];
   game.usedWords = new Set();
   // playerIds + playerSockets intentionally kept — valid between rounds
+  // bountyActive intentionally kept — persists until a win cashes it
   game.status = "playing";
   game.winner = undefined;
   game.startTime = Date.now();
-  logger.info({ gameId: game.id, word: game.word }, "New round");
+  logger.info({ gameId: game.id, word: game.word, bountyActive: game.bountyActive }, "New round");
 }
 
 function getOrCreateGame(gameId: string, mode: "shared" | "dual"): Game {
@@ -193,6 +199,20 @@ function playerView(game: Game, playerId: string): object[] {
 async function emitGameOver(game: Game, status: "won" | "lost", winner?: string): Promise<void> {
   const elapsedSeconds = Math.floor((Date.now() - game.startTime) / 1000);
   const base = calcRewards(game, status, elapsedSeconds);
+
+  // Apply bounty (2×) to base rewards BEFORE streak/daily multipliers
+  let bountyApplied = false;
+  if (status === "won" && game.bountyActive) {
+    base.intelligence = Math.round(base.intelligence * 2);
+    base.coins = Math.round(base.coins * 2);
+    bountyApplied = true;
+    game.bountyActive = false;
+  } else if (status === "lost") {
+    game.bountyActive = true; // arms bounty for next win
+  } else {
+    game.bountyActive = false;
+  }
+
   const team = getOrCreateTeam(game.players);
   const applied = applyTeamRewards(team, base);
   const won = status === "won";
@@ -241,11 +261,13 @@ async function emitGameOver(game: Game, status: "won" | "lost", winner?: string)
     status,
     winner: winner ?? null,
     word: game.word,
+    bountyNextRound: status === "lost",   // tells client to show 2× bonus offer
     rewards: {
       intelligence: applied.intelligence,
       coins: applied.coins,
       almostBonus: base.almostBonus,
       greatTeamwork: base.greatTeamwork,
+      bountyApplied,                       // true when 2× was earned this round
       streakDays: applied.streakDays,
       dailyBonus: applied.dailyBonus,
       streakMultiplier: applied.streakMultiplier,
