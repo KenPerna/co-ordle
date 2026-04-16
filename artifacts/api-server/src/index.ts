@@ -106,7 +106,7 @@ function calcRewards(game: Game, status: "won" | "lost", elapsedSeconds: number)
     for (const round of game.rounds as DualRound[]) {
       for (const pid of Object.keys(round.guesses)) contribs.set(pid, (contribs.get(pid) ?? 0) + 1);
     }
-    greatTeamwork = game.players.slice(0, 2).every((p) => (contribs.get(p) ?? 0) >= 2);
+    greatTeamwork = game.players.slice(0, 2).every((p) => (contribs.get(p) ?? 0) >= 1);
   }
 
   // Intelligence tokens
