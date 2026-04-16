@@ -70,31 +70,47 @@ function playerColor(name: string) {
   return PLAYER_PALETTE[h];
 }
 
-function Tile({ letter, color, size = 52 }: { letter?: string; color: TileColor; size?: number }) {
+function Tile({ letter, color, size = 52, highlighted = false }: { letter?: string; color: TileColor; size?: number; highlighted?: boolean }) {
   return (
     <div style={{
       width: size, height: size, display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: size * 0.4, fontWeight: 700, border: `2px solid ${color === "empty" ? "#3a3a3c" : TILE_BG[color]}`,
+      fontSize: size * 0.4, fontWeight: 700,
+      border: highlighted ? `2px solid #fff` : `2px solid ${color === "empty" ? "#3a3a3c" : TILE_BG[color]}`,
       borderRadius: 4, background: TILE_BG[color], color: "#fff", textTransform: "uppercase",
       transition: "background 0.3s",
+      boxShadow: highlighted ? "0 0 0 1px rgba(255,255,255,0.3), inset 0 0 0 1px rgba(255,255,255,0.1)" : "none",
     }}>
       {letter ?? ""}
     </div>
   );
 }
 
-function Board({ rounds, maxRows = ROWS, cols = COLS, showLetters = true, tileSize = 52 }: {
+function Board({ rounds, maxRows = ROWS, cols = COLS, showLetters = true, tileSize = 52,
+  activeGuess, selectedCol, onTileClick }: {
   rounds: { letters: string[]; colors: TileColor[] }[];
   maxRows?: number; cols?: number; showLetters?: boolean; tileSize?: number;
+  activeGuess?: string[]; selectedCol?: number; onTileClick?: (col: number) => void;
 }) {
+  const activeRowIndex = rounds.length;
   const rows = [...rounds, ...Array(Math.max(0, maxRows - rounds.length)).fill({ letters: [], colors: [] })];
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${tileSize}px)`, gap: 5 }}>
       {rows.slice(0, maxRows).map((row, ri) =>
         Array.from({ length: cols }).map((_, ci) => {
-          const letter = showLetters ? row.letters?.[ci]?.toUpperCase() : undefined;
-          const color: TileColor = (row.colors?.[ci] as TileColor) ?? "empty";
-          return <Tile key={`${ri}-${ci}`} letter={letter} color={color} size={tileSize} />;
+          const isActiveRow = ri === activeRowIndex && activeGuess != null;
+          const letter = isActiveRow
+            ? (activeGuess![ci]?.trim() || undefined)
+            : (showLetters ? row.letters?.[ci]?.toUpperCase() : undefined);
+          const color: TileColor = isActiveRow
+            ? (activeGuess![ci]?.trim() ? "pending" : "empty")
+            : ((row.colors?.[ci] as TileColor) ?? "empty");
+          const highlighted = isActiveRow && ci === selectedCol;
+          return (
+            <div key={`${ri}-${ci}`} onClick={() => isActiveRow && onTileClick?.(ci)}
+              style={{ cursor: isActiveRow ? "pointer" : "default" }}>
+              <Tile letter={letter?.toUpperCase()} color={color} size={tileSize} highlighted={highlighted} />
+            </div>
+          );
         })
       )}
     </div>
@@ -395,7 +411,9 @@ export default function Game() {
   const [teamStats, setTeamStats] = useState<TeamSessionStats | null>(null);
   const [bountyNextRound, setBountyNextRound] = useState(false);
 
-  const [currentGuess, setCurrentGuess] = useState("");
+  const EMPTY_GUESS = "     "; // 5 spaces — one slot per column
+  const [currentGuess, setCurrentGuess] = useState(EMPTY_GUESS);
+  const [selectedCol, setSelectedCol] = useState(0);
   const [wordError, setWordError] = useState<string | null>(null);
 
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
@@ -501,7 +519,8 @@ export default function Game() {
       setDualRounds([]);
       setGameStatus("playing");
       setWinner(null);
-      setCurrentGuess("");
+      setCurrentGuess("     ");
+      setSelectedCol(0);
       setWaitingForPartner(false);
       setPartnerReady(false);
       addSystem("New round started!");
@@ -561,7 +580,7 @@ export default function Game() {
   }, []);
 
   const submitGuess = useCallback(() => {
-    const guess = currentGuess.trim().toLowerCase();
+    const guess = currentGuess.replace(/ /g, "").toLowerCase();
     if (guess.length !== COLS || !socketRef.current || gameStatus !== "playing") return;
     if (gameMode === "dual" && waitingForPartner) return;
 
@@ -570,7 +589,8 @@ export default function Game() {
     }
 
     socketRef.current.emit("guess", { gameId, playerId: playerName, guess });
-    setCurrentGuess("");
+    setCurrentGuess("     ");
+    setSelectedCol(0);
   }, [currentGuess, gameId, playerName, gameMode, gameStatus, waitingForPartner]);
 
   const sendChat = useCallback(() => {
@@ -579,12 +599,6 @@ export default function Game() {
     socketRef.current.emit("chat", { gameId, player: playerName, text });
     setChatInput("");
   }, [chatInput, gameId, playerName]);
-
-  const handleTyping = useCallback((val: string) => {
-    setCurrentGuess(val);
-    if (!socketRef.current) return;
-    socketRef.current.emit("typing", { gameId, player: playerName });
-  }, [gameId, playerName]);
 
   const sharedBoardRows = sharedRounds.map((r) => ({ letters: r.guess.split(""), colors: r.result as TileColor[] }));
   const myBoardRows = dualRounds.map((r) => ({ letters: r.own ? r.own.word.split("") : [], colors: (r.own?.result ?? []) as TileColor[] }));
@@ -610,12 +624,42 @@ export default function Game() {
 
   const handleKeyPress = useCallback((letter: string) => {
     if (isInputDisabled) return;
-    setCurrentGuess((prev) => prev.length < COLS ? prev + letter.toLowerCase() : prev);
-  }, [isInputDisabled]);
+    setCurrentGuess((prev) => {
+      const chars = prev.padEnd(COLS, " ").split("");
+      chars[selectedCol] = letter.toLowerCase();
+      return chars.join("");
+    });
+    setSelectedCol((prev) => Math.min(prev + 1, COLS - 1));
+    socketRef.current?.emit("typing", { gameId, player: playerName });
+  }, [isInputDisabled, selectedCol, gameId, playerName]);
 
   const handleBackspace = useCallback(() => {
-    setCurrentGuess((prev) => prev.slice(0, -1));
-  }, []);
+    if (isInputDisabled) return;
+    setCurrentGuess((prev) => {
+      const chars = prev.padEnd(COLS, " ").split("");
+      if (chars[selectedCol]?.trim()) {
+        chars[selectedCol] = " "; // clear current; cursor stays
+      } else {
+        const target = Math.max(0, selectedCol - 1);
+        chars[target] = " "; // clear previous
+        setSelectedCol(target);
+      }
+      return chars.join("");
+    });
+  }, [isInputDisabled, selectedCol]);
+
+  // Physical keyboard input — routes to grid-based handlers
+  useEffect(() => {
+    if (!inRoom || isInputDisabled) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "Enter") { e.preventDefault(); submitGuess(); }
+      else if (e.key === "Backspace") { e.preventDefault(); handleBackspace(); }
+      else if (e.key.length === 1 && /^[a-zA-Z]$/.test(e.key)) handleKeyPress(e.key);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inRoom, isInputDisabled, submitGuess, handleBackspace, handleKeyPress]);
 
   let statusText = "Guess the 5-letter word!";
   if (gameMode === "dual" && waitingForPartner) statusText = "Waiting for partner...";
@@ -718,7 +762,8 @@ export default function Game() {
             setWinner(null);
             setRevealWord(null);
             setRewards(null);
-            setCurrentGuess("");
+            setCurrentGuess("     ");
+            setSelectedCol(0);
             setWaitingForPartner(false);
             setPartnerReady(false);
           }}
@@ -755,12 +800,24 @@ export default function Game() {
           <p style={s.statusText}>{statusText}</p>
 
           {gameMode === "shared" ? (
-            <Board rounds={sharedBoardRows} />
+            <Board
+              rounds={sharedBoardRows}
+              activeGuess={isInputDisabled ? undefined : currentGuess.split("")}
+              selectedCol={selectedCol}
+              onTileClick={setSelectedCol}
+            />
           ) : (
             <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center" }}>
               <div>
                 <p style={s.boardLabel}>Your Board</p>
-                <Board rounds={myBoardRows} showLetters={true} tileSize={48} />
+                <Board
+                  rounds={myBoardRows}
+                  showLetters={true}
+                  tileSize={48}
+                  activeGuess={isInputDisabled ? undefined : currentGuess.split("")}
+                  selectedCol={selectedCol}
+                  onTileClick={setSelectedCol}
+                />
               </div>
               <div>
                 <p style={s.boardLabel}>Partner Insight</p>
@@ -768,27 +825,6 @@ export default function Game() {
               </div>
             </div>
           )}
-
-          <div style={{ ...s.inputRow, marginTop: 16 }}>
-            <input
-              style={{ ...s.input, flex: 1, minWidth: 0, opacity: isInputDisabled ? 0.5 : 1, textTransform: "uppercase", letterSpacing: 4, fontWeight: 700 }}
-              value={currentGuess.toUpperCase()}
-              maxLength={COLS}
-              placeholder={isInputDisabled ? (waitingForPartner ? "Waiting for partner..." : "Game over") : "_ _ _ _ _"}
-              disabled={isInputDisabled}
-              onChange={(e) => handleTyping(e.target.value.toLowerCase().replace(/[^a-z]/g, ""))}
-              onKeyDown={(e) => e.key === "Enter" && submitGuess()}
-              data-testid="input-guess"
-            />
-            <button
-              style={{ ...s.btn, opacity: isInputDisabled ? 0.5 : 1 }}
-              onClick={submitGuess}
-              disabled={isInputDisabled}
-              data-testid="button-guess"
-            >
-              Guess
-            </button>
-          </div>
 
           <Keyboard
             letterStates={letterStates}
