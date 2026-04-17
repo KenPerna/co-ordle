@@ -1,4 +1,4 @@
-import Tile from "./Tile";
+import React, { useState } from "react";
 
 const KB_ROWS = [
   "QWERTYUIOP".split(""),
@@ -7,7 +7,7 @@ const KB_ROWS = [
 ];
 
 /**
- * Keyboard — the on-screen QWERTY keyboard for Co-Ordle.
+ * KeyboardInline — on-screen QWERTY keyboard (inline-style version).
  *
  * Props:
  *   letterStates {Object}   - Map of lowercase letter → color ("green"|"yellow"|"gray"|"empty")
@@ -16,7 +16,7 @@ const KB_ROWS = [
  *   onEnter      {Function} - Called when the enter key (↵) is pressed
  *   disabled     {boolean}  - Disables all keys when true
  */
-export default function Keyboard({ letterStates = {}, onKey, onDelete, onEnter, disabled = false }) {
+export default function KeyboardInline({ letterStates = {}, onKey, onDelete, onEnter, disabled = false }) {
   return (
     <div
       style={{
@@ -72,6 +72,77 @@ export default function Keyboard({ letterStates = {}, onKey, onDelete, onEnter, 
           })}
         </div>
       ))}
+    </div>
+  );
+}
+
+const ROW_1 = ["Q","W","E","R","T","Y","U","I","O","P"];
+const ROW_2 = ["A","S","D","F","G","H","J","K","L"];
+const ROW_3 = ["ENTER","Z","X","C","V","B","N","M","⌫"];
+
+function Key({ label, color = "", onPress }) {
+  const [pressed, setPressed] = useState(false);
+
+  function handleClick() {
+    setPressed(true);
+    onPress(label);
+    setTimeout(() => setPressed(false), 90);
+  }
+
+  const classNames = [
+    "key",
+    color,                 // "correct" | "present" | "absent" | ""
+    pressed ? "press" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <button className={classNames} onClick={handleClick}>
+      {label}
+    </button>
+  );
+}
+
+export function Keyboard({ keyColors = {}, onKey }) {
+  // keyColors: { [letter: string]: "correct" | "present" | "absent" }
+
+  function handlePress(label) {
+    onKey(label);
+  }
+
+  return (
+    <div className="keyboard">
+      <div className="keyboard-row">
+        {ROW_1.map(k => (
+          <Key
+            key={k}
+            label={k}
+            color={keyColors[k]}
+            onPress={handlePress}
+          />
+        ))}
+      </div>
+      <div className="keyboard-row">
+        {ROW_2.map(k => (
+          <Key
+            key={k}
+            label={k}
+            color={keyColors[k]}
+            onPress={handlePress}
+          />
+        ))}
+      </div>
+      <div className="keyboard-row">
+        {ROW_3.map(k => (
+          <Key
+            key={k}
+            label={k}
+            color={keyColors[k]}
+            onPress={handlePress}
+          />
+        ))}
+      </div>
     </div>
   );
 }
