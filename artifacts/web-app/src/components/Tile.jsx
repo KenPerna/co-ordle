@@ -1,3 +1,5 @@
+import React from "react";
+
 const TILE_BG = {
   green: "#538d4e",
   yellow: "#b59f3b",
@@ -7,7 +9,7 @@ const TILE_BG = {
 };
 
 /**
- * Tile — a single letter tile on the Co-Ordle board.
+ * TileInline — a single letter tile on the Co-Ordle board (inline-style version).
  *
  * Props:
  *   letter      {string}  - The letter to display (optional)
@@ -15,7 +17,7 @@ const TILE_BG = {
  *   size        {number}  - Tile size in px (default: 52)
  *   highlighted {boolean} - Whether this tile is the active cursor position (default: false)
  */
-export default function Tile({ letter, color = "empty", size = 52, highlighted = false }) {
+export default function TileInline({ letter, color = "empty", size = 52, highlighted = false }) {
   return (
     <div
       style={{
@@ -42,4 +44,20 @@ export default function Tile({ letter, color = "empty", size = 52, highlighted =
       {letter ?? ""}
     </div>
   );
+}
+
+export function Tile({ letter = "", state = "", isActive = false, animate = "" }) {
+  // state: "correct" | "present" | "absent" | "" (empty)
+  // animate: "flip" | "pop" | "" (none)
+
+  const classNames = [
+    "tile",
+    state,          // color state
+    isActive ? "active" : "",
+    animate         // animation class
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return <div className={classNames}>{letter}</div>;
 }
