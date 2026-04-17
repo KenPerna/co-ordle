@@ -405,6 +405,13 @@ export default function Game() {
   const [rewards, setRewards] = useState<RewardInfo | null>(null);
   const [showRewardScreen, setShowRewardScreen] = useState(false);
 
+  // Frozen snapshot of the result captured at gameOver — never mutated by newRound
+  const [endGameSnapshot, setEndGameSnapshot] = useState<{
+    status: GameStatus; revealWord: string | null; rewards: RewardInfo | null;
+    playerStats: PlayerStats | null; partnerStats: PlayerStats | null;
+    teamStats: TeamSessionStats | null; bountyNextRound: boolean;
+  } | null>(null);
+
   // ── Player / team stats from DB ──────────────────────────────────────────────
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
   const [partnerStats, setPartnerStats] = useState<PlayerStats | null>(null);
@@ -509,6 +516,17 @@ export default function Game() {
       if (ps) setPlayerStats(ps);
       if (pts) setPartnerStats(pts);
       if (ts) setTeamStats(ts);
+      // Freeze a snapshot — this is what the end-game screen always shows,
+      // regardless of background resets from newRound events.
+      setEndGameSnapshot({
+        status,
+        revealWord: word,
+        rewards: r ?? null,
+        playerStats: ps ?? null,
+        partnerStats: pts ?? null,
+        teamStats: ts ?? null,
+        bountyNextRound: bnr ?? false,
+      });
     });
 
     socket.on("newRound", () => {
@@ -575,6 +593,7 @@ export default function Game() {
     setWaitingForPartner(false);
     setPartnerReady(false);
     setRewards(null);
+    setEndGameSnapshot(null);
     setGameStatus("playing");
     setShowRewardScreen(false);
   }, []);
@@ -742,17 +761,17 @@ export default function Game() {
     <div style={s.page}>
       <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
-      {showRewardScreen && (
+      {showRewardScreen && endGameSnapshot && (
         <RewardScreen
-          status={gameStatus}
-          revealWord={revealWord}
-          rewards={rewards}
+          status={endGameSnapshot.status}
+          revealWord={endGameSnapshot.revealWord}
+          rewards={endGameSnapshot.rewards}
           playerName={playerName}
           partnerName={players.find((p) => p !== playerName) ?? null}
-          playerStats={playerStats}
-          partnerStats={partnerStats}
-          teamStats={teamStats}
-          bountyNextRound={bountyNextRound}
+          playerStats={endGameSnapshot.playerStats}
+          partnerStats={endGameSnapshot.partnerStats}
+          teamStats={endGameSnapshot.teamStats}
+          bountyNextRound={endGameSnapshot.bountyNextRound}
           onLeave={leaveRoom}
           onDismiss={() => {
             setShowRewardScreen(false);
@@ -762,6 +781,7 @@ export default function Game() {
             setWinner(null);
             setRevealWord(null);
             setRewards(null);
+            setEndGameSnapshot(null);
             setCurrentGuess("     ");
             setSelectedCol(0);
             setWaitingForPartner(false);
