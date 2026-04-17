@@ -1,4 +1,5 @@
 import React from "react";
+import "./Tile.css";
 
 const TILE_BG = {
   green: "#538d4e",
