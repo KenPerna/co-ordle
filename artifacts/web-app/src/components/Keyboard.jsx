@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import "./Keyboard.css";
 
 const KB_ROWS = [
   "QWERTYUIOP".split(""),
@@ -89,8 +90,10 @@ function Key({ label, color = "", onPress }) {
     setTimeout(() => setPressed(false), 90);
   }
 
+  const isWide = label === "ENTER" || label === "⌫";
   const classNames = [
     "key",
+    isWide ? "wide" : "",
     color,                 // "correct" | "present" | "absent" | ""
     pressed ? "press" : ""
   ]

@@ -1,0 +1,61 @@
+.keyboard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.keyboard-row {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.key {
+  height: 56px;
+  min-width: 36px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 6px;
+  background-color: #374151;
+  color: #f9fafb;
+  font-weight: 700;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 150ms ease, transform 60ms ease;
+  user-select: none;
+}
+
+.key.wide {
+  min-width: 54px;
+  font-size: 11px;
+}
+
+/* Color states */
+.key.correct {
+  background-color: #22c55e;
+  color: #fff;
+}
+
+.key.present {
+  background-color: #eab308;
+  color: #fff;
+}
+
+.key.absent {
+  background-color: #1f2937;
+  color: #4b5563;
+}
+
+/* Press animation */
+.key.press {
+  transform: scale(0.92);
+}
