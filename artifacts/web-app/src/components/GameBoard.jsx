@@ -7,11 +7,12 @@ import "./GameBoard.css";
  *
  * Props:
  *   board       {string[][]}  - 2D array of letters, e.g. [["H","E","L","L","O"], ...]
- *   evaluations {string[][]}  - 2D array of states per tile: "correct" | "present" | "absent" | ""
+ *   evaluations {string[][]}  - 2D array of states: "correct" | "present" | "absent" | ""
+ *   animations  {string[][]}  - 2D array of animation classes: "flip" | "pop" | ""
  *   activeRow   {number}      - Index of the row currently being typed
  *   activeCol   {number}      - Index of the highlighted column in the active row
  */
-export function GameBoard({ board, evaluations, activeRow, activeCol }) {
+export function GameBoard({ board, evaluations, animations = [], activeRow, activeCol }) {
   return (
     <div className="board">
       {board.map((row, rowIndex) => (
@@ -19,6 +20,7 @@ export function GameBoard({ board, evaluations, activeRow, activeCol }) {
           {row.map((letter, colIndex) => {
             const state = evaluations[rowIndex]?.[colIndex] || "";
             const isActive = rowIndex === activeRow && colIndex === activeCol;
+            const animate = animations[rowIndex]?.[colIndex] || "";
 
             return (
               <Tile
@@ -26,6 +28,7 @@ export function GameBoard({ board, evaluations, activeRow, activeCol }) {
                 letter={letter}
                 state={state}
                 isActive={isActive}
+                animate={animate}
               />
             );
           })}
