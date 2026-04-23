@@ -118,4 +118,4 @@ export async function getTeamSession(
   return rows[0] ?? null;
 }
 
-pool.on("error", (err) => logger.error({ err }, "DB pool error"));
+pool.on("error", (err: Error) => logger.error({ err }, "DB pool error"));

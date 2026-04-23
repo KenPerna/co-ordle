@@ -2,7 +2,7 @@ import http from "http";
 import { Server } from "socket.io";
 import app from "./app";
 import { logger } from "./lib/logger";
-import { evaluateGuess, pickSecretWord } from "./game/wordEngine";
+import { evaluateGuess, isValidGuessWord, pickSecretWord } from "./game/wordEngine";
 import { upsertPlayer, getPlayer, updatePlayerStats, upsertTeamSession, getTeamSession } from "./db";
 
 const rawPort = process.env["PORT"];
@@ -290,8 +290,8 @@ async function emitGameOver(game: Game, status: "won" | "lost", winner?: string)
   if (s2) io.to(s2).emit("gameOver", { ...basePayload, playerStats: p2Stats, partnerStats: p1Stats });
 
   // Fallback: broadcast to anyone not in playerSockets (e.g. spectators or single player)
-  const knownSockets = new Set([s1, s2].filter(Boolean));
-  io.to(game.id).except([...knownSockets]).emit("gameOver", basePayload);
+  const knownSockets = [s1, s2].filter((socketId): socketId is string => Boolean(socketId));
+  io.to(game.id).except(knownSockets).emit("gameOver", basePayload);
 }
 
 // ─── Guess handlers ─────────────────────────────────────────────────────────────
@@ -430,6 +430,10 @@ io.on("connection", (socket) => {
     if (!game) return;
     const g = guess.toLowerCase().trim();
     if (!g || g.length !== 5) return;
+    if (!isValidGuessWord(g)) {
+      socket.emit("invalidWord", { guess: g });
+      return;
+    }
     if (game.mode === "shared") handleSharedGuess(game, playerId, g);
     else handleDualGuess(game, playerId, g);
   });

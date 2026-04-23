@@ -8,9 +8,14 @@ const WORD_LIST = [
   "quiet", "raise", "shelf", "tiger", "under",
   "vivid", "wheat", "extra", "young", "zebra",
 ];
+const WORD_SET = new Set(WORD_LIST);
 
 export function pickSecretWord(): string {
   return WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+}
+
+export function isValidGuessWord(guess: string): boolean {
+  return WORD_SET.has(guess.toLowerCase());
 }
 
 export function evaluateGuess(secret: string, guess: string): string[] {

@@ -500,6 +500,10 @@ export default function Game() {
       setWordError(`"${guess.toUpperCase()}" was already guessed`);
       setTimeout(() => setWordError(null), 3000);
     });
+    socket.on("invalidWord", ({ guess }: { guess: string }) => {
+      setWordError(`"${guess.toUpperCase()}" is not in the word list`);
+      setTimeout(() => setWordError(null), 3000);
+    });
 
     socket.on("gameOver", ({ status, winner: w, word, rewards: r, bountyNextRound: bnr, playerStats: ps, partnerStats: pts, teamStats: ts }: {
       status: GameStatus; winner?: string; word: string; rewards?: RewardInfo;
@@ -607,10 +611,10 @@ export default function Game() {
       setDualRounds((prev) => [...prev, { own: { word: guess, result: [] }, waiting: true }]);
     }
 
-    socketRef.current.emit("guess", { gameId, playerId: playerName, guess });
+    socketRef.current.emit("guess", { gameId, playerId, guess });
     setCurrentGuess("     ");
     setSelectedCol(0);
-  }, [currentGuess, gameId, playerName, gameMode, gameStatus, waitingForPartner]);
+  }, [currentGuess, gameId, playerId, gameMode, gameStatus, waitingForPartner]);
 
   const sendChat = useCallback(() => {
     const text = chatInput.trim();
@@ -915,7 +919,7 @@ const s: Record<string, React.CSSProperties> = {
   inputRow: { display: "flex", gap: 8, width: "100%", maxWidth: 360 },
   input: { padding: "13px 14px", borderRadius: 10, border: "1px solid #3a3a3c", background: "#1a1a1b", color: "#fff", fontSize: 16, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
   btn: { padding: "13px 18px", borderRadius: 10, border: "none", background: "#538d4e", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", whiteSpace: "nowrap" },
-  chatSection: { display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 260, maxWidth: 380 },
+  chatSection: { display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 200, maxWidth: 240 },
   chatTitle: { margin: 0, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#818384" },
   chatBox: { flex: 1, minHeight: 260, maxHeight: 400, overflowY: "auto", background: "#1a1a1b", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 5, border: "1px solid #2a2a2c" },
   chatMsg: { fontSize: 14, lineHeight: 1.5, wordBreak: "break-word" },
