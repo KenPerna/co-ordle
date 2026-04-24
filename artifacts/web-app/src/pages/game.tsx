@@ -473,12 +473,12 @@ export default function Game() {
       });
     });
 
-    socket.on("playerSubmitted", ({ playerId }: { playerId: string }) => {
-      if (playerId === playerName) {
+    socket.on("playerSubmitted", ({ playerId: submittedPlayerId, playerName: submittedPlayerName }: { playerId: string; playerName?: string }) => {
+      if (submittedPlayerId === playerId) {
         setWaitingForPartner(true);
       } else {
         setPartnerReady(true);
-        addSystem(`${playerId} submitted their guess`);
+        addSystem(`${submittedPlayerName ?? "Partner"} submitted their guess`);
       }
     });
 
@@ -551,7 +551,7 @@ export default function Game() {
     socket.on("chatMessage", (msg: ChatMsg) => setChatMessages((prev) => [...prev, msg]));
 
     return () => { socket.disconnect(); };
-  }, [playerName]);
+  }, [playerId, playerName]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });

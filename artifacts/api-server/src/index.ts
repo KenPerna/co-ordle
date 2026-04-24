@@ -186,6 +186,20 @@ function getOrCreateGame(gameId: string, mode: "shared" | "dual"): Game {
   return games.get(gameId)!;
 }
 
+function getPlayerNameById(game: Game, playerId: string): string | undefined {
+  for (const [name, id] of game.playerIds.entries()) {
+    if (id === playerId) return name;
+  }
+  return undefined;
+}
+
+function getActiveDualPlayerIds(game: Game): string[] {
+  return game.players
+    .map((name) => game.playerIds.get(name))
+    .filter((id): id is string => Boolean(id))
+    .slice(0, 2);
+}
+
 function playerView(game: Game, playerId: string): object[] {
   if (game.mode === "shared") return game.rounds;
   return (game.rounds as DualRound[]).map((round) => {
@@ -326,35 +340,40 @@ function handleDualGuess(game: Game, playerId: string, guess: string): void {
   if (game.usedWords.has(key)) { io.to(game.id).emit("wordAlreadyUsed", { guess, playerId }); return; }
 
   game.usedWords.add(key);
-  const activePlayers = game.players.slice(0, 2);
+  const activePlayerIds = getActiveDualPlayerIds(game);
   let round = game.rounds[game.rounds.length - 1] as DualRound | undefined;
 
-  if (!round || round.type !== "dual" || Object.keys(round.guesses).length >= activePlayers.length) {
+  if (!round || round.type !== "dual" || Object.keys(round.guesses).length >= activePlayerIds.length) {
     round = { type: "dual", guesses: {} };
     game.rounds.push(round);
   }
 
   round.guesses[playerId] = { word: guess, result: evaluateGuess(game.word.toLowerCase(), guess) };
+  const playerName = getPlayerNameById(game, playerId);
   logger.info({ gameId: game.id, playerId, guess }, "Dual guess");
-  io.to(game.id).emit("playerSubmitted", { playerId });
+  io.to(game.id).emit("playerSubmitted", { playerId, playerName });
 
-  const allSubmitted = activePlayers.length >= 2 && activePlayers.every((p) => round!.guesses[p]);
+  const allSubmitted = activePlayerIds.length >= 2 && activePlayerIds.every((id) => round!.guesses[id]);
   if (!allSubmitted) return;
 
-  const [p1, p2] = activePlayers;
+  const [p1Id, p2Id] = activePlayerIds;
+  if (!p1Id || !p2Id) return;
+  const p1Name = getPlayerNameById(game, p1Id) ?? p1Id;
+  const p2Name = getPlayerNameById(game, p2Id) ?? p2Id;
 
-  logger.info({ gameId: game.id, [p1]: round.guesses[p1].word, [p2]: round.guesses[p2].word }, "Dual round resolved");
+  logger.info({ gameId: game.id, [p1Name]: round.guesses[p1Id].word, [p2Name]: round.guesses[p2Id].word }, "Dual round resolved");
 
-  const s1 = game.playerSockets.get(p1);
-  const s2 = game.playerSockets.get(p2);
-  if (s1) io.to(s1).emit("roundResult", { own: round.guesses[p1], other: { result: round.guesses[p2].result } });
-  if (s2) io.to(s2).emit("roundResult", { own: round.guesses[p2], other: { result: round.guesses[p1].result } });
+  const s1 = game.playerSockets.get(p1Name);
+  const s2 = game.playerSockets.get(p2Name);
+  if (s1) io.to(s1).emit("roundResult", { own: round.guesses[p1Id], other: { result: round.guesses[p2Id].result } });
+  if (s2) io.to(s2).emit("roundResult", { own: round.guesses[p2Id], other: { result: round.guesses[p1Id].result } });
 
-  const p1Won = round.guesses[p1]?.result.every((r) => r === "green");
-  const p2Won = round.guesses[p2]?.result.every((r) => r === "green");
+  const p1Won = round.guesses[p1Id]?.result.every((r) => r === "green");
+  const p2Won = round.guesses[p2Id]?.result.every((r) => r === "green");
 
   if (p1Won || p2Won) {
-    const winner = p1Won ? p1 : p2;
+    const winnerId = p1Won ? p1Id : p2Id;
+    const winner = getPlayerNameById(game, winnerId) ?? winnerId;
     game.status = "won";
     game.winner = winner;
     emitGameOver(game, "won", winner);
@@ -413,7 +432,7 @@ io.on("connection", (socket) => {
 
     socket.emit("gameState", {
       mode: game.mode,
-      rounds: playerView(game, player),
+      rounds: playerView(game, playerId ?? player),
       status: game.status,
       winner: game.winner,
       players: game.players,
