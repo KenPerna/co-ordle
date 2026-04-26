@@ -326,11 +326,11 @@ function handleSharedGuess(game: Game, playerId: string, guess: string): void {
     game.status = "won";
     game.winner = playerId;
     emitGameOver(game, "won", playerId);
-    setTimeout(() => { resetGame(game); io.to(game.id).emit("newRound", { mode: game.mode }); }, 5000);
+    setTimeout(() => { resetGame(game); io.to(game.id).emit("newRound", { mode: game.mode }); }, 15000);
   } else if (game.rounds.length >= MAX_GUESSES) {
     game.status = "lost";
     emitGameOver(game, "lost");
-    setTimeout(() => { resetGame(game); io.to(game.id).emit("newRound", { mode: game.mode }); }, 5000);
+    setTimeout(() => { resetGame(game); io.to(game.id).emit("newRound", { mode: game.mode }); }, 15000);
   }
 }
 
@@ -377,11 +377,11 @@ function handleDualGuess(game: Game, playerId: string, guess: string): void {
     game.status = "won";
     game.winner = winner;
     emitGameOver(game, "won", winner);
-    setTimeout(() => { resetGame(game); io.to(game.id).emit("newRound", { mode: game.mode }); }, 5000);
+    setTimeout(() => { resetGame(game); io.to(game.id).emit("newRound", { mode: game.mode }); }, 15000);
   } else if (game.rounds.length >= MAX_GUESSES) {
     game.status = "lost";
     emitGameOver(game, "lost");
-    setTimeout(() => { resetGame(game); io.to(game.id).emit("newRound", { mode: game.mode }); }, 5000);
+    setTimeout(() => { resetGame(game); io.to(game.id).emit("newRound", { mode: game.mode }); }, 15000);
   }
 }
 
