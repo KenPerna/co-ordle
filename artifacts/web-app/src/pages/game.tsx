@@ -457,8 +457,6 @@ export default function Game() {
     });
 
     socket.on("roundResult", (data: { own: { word: string; result: string[] }; other: { result: string[] } }) => {
-      // DEBUG: confirm we only received our own data (no partner word should be present)
-      console.log("[Dual] roundResult received — own word:", data.own.word, "| partner colors:", data.other.result);
       setWaitingForPartner(false);
       setPartnerReady(false);
       setDualRounds((prev) => {
@@ -499,10 +497,28 @@ export default function Game() {
     socket.on("wordAlreadyUsed", ({ guess }: { guess: string }) => {
       setWordError(`"${guess.toUpperCase()}" was already guessed`);
       setTimeout(() => setWordError(null), 3000);
+      setWaitingForPartner(false);
+      setDualRounds((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.waiting && last.own?.word === guess) return prev.slice(0, -1);
+        return prev;
+      });
+      const chars = Array.from({ length: COLS }, (_, i) => (guess[i] ?? " "));
+      setCurrentGuess(chars.join(""));
+      setSelectedCol(Math.min(guess.length, COLS - 1));
     });
     socket.on("invalidWord", ({ guess }: { guess: string }) => {
       setWordError(`"${guess.toUpperCase()}" is not in the word list`);
       setTimeout(() => setWordError(null), 3000);
+      setWaitingForPartner(false);
+      setDualRounds((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.waiting && last.own?.word === guess) return prev.slice(0, -1);
+        return prev;
+      });
+      const chars = Array.from({ length: COLS }, (_, i) => (guess[i] ?? " "));
+      setCurrentGuess(chars.join(""));
+      setSelectedCol(Math.min(guess.length, COLS - 1));
     });
 
     socket.on("gameOver", ({ status, winner: w, word, rewards: r, bountyNextRound: bnr, playerStats: ps, partnerStats: pts, teamStats: ts }: {
@@ -606,9 +622,9 @@ export default function Game() {
     const guess = currentGuess.replace(/ /g, "").toLowerCase();
     if (guess.length !== COLS || !socketRef.current || gameStatus !== "playing") return;
     if (gameMode === "dual" && waitingForPartner) return;
-
     if (gameMode === "dual") {
       setDualRounds((prev) => [...prev, { own: { word: guess, result: [] }, waiting: true }]);
+      setWaitingForPartner(true);
     }
 
     socketRef.current.emit("guess", { gameId, playerId, guess });

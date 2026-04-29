@@ -1,21 +1,11 @@
-const WORD_LIST = [
-  "crane", "slate", "table", "brave", "light",
-  "storm", "plant", "steam", "grain", "cloud",
-  "flame", "frost", "globe", "place", "river",
-  "brush", "chess", "drift", "elder", "fancy",
-  "grape", "heard", "image", "judge", "kneel",
-  "lemon", "moist", "noise", "ocean", "pride",
-  "quiet", "raise", "shelf", "tiger", "under",
-  "vivid", "wheat", "extra", "young", "zebra",
-];
-const WORD_SET = new Set(WORD_LIST);
+import { ANSWER_WORDS, VALID_WORDS } from "./wordList";
 
 export function pickSecretWord(): string {
-  return WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+  return ANSWER_WORDS[Math.floor(Math.random() * ANSWER_WORDS.length)]!;
 }
 
 export function isValidGuessWord(guess: string): boolean {
-  return WORD_SET.has(guess.toLowerCase());
+  return VALID_WORDS.has(guess.toLowerCase());
 }
 
 export function evaluateGuess(secret: string, guess: string): string[] {

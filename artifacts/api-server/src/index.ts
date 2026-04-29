@@ -1,5 +1,5 @@
 import http from "http";
-import { Server } from "socket.io";
+import { Server, type Socket } from "socket.io";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { evaluateGuess, isValidGuessWord, pickSecretWord } from "./game/wordEngine";
@@ -193,6 +193,13 @@ function getPlayerNameById(game: Game, playerId: string): string | undefined {
   return undefined;
 }
 
+/** Emit to the socket for the player who submitted this guess key (UUID or display name). */
+function emitToGuessPlayer(game: Game, guessPlayerKey: string, event: string, payload: object): void {
+  const displayName = getPlayerNameById(game, guessPlayerKey) ?? guessPlayerKey;
+  const sid = game.playerSockets.get(displayName);
+  if (sid) io.to(sid).emit(event, payload);
+}
+
 function getActiveDualPlayerIds(game: Game): string[] {
   return game.players
     .map((name) => game.playerIds.get(name))
@@ -334,10 +341,13 @@ function handleSharedGuess(game: Game, playerId: string, guess: string): void {
   }
 }
 
-function handleDualGuess(game: Game, playerId: string, guess: string): void {
+function handleDualGuess(game: Game, playerId: string, guess: string, submitter: Socket): void {
   if (game.status !== "playing") return;
   const key = `${playerId}:${guess}`;
-  if (game.usedWords.has(key)) { io.to(game.id).emit("wordAlreadyUsed", { guess, playerId }); return; }
+  if (game.usedWords.has(key)) {
+    emitToGuessPlayer(game, playerId, "wordAlreadyUsed", { guess, playerId });
+    return;
+  }
 
   game.usedWords.add(key);
   const activePlayerIds = getActiveDualPlayerIds(game);
@@ -351,7 +361,8 @@ function handleDualGuess(game: Game, playerId: string, guess: string): void {
   round.guesses[playerId] = { word: guess, result: evaluateGuess(game.word.toLowerCase(), guess) };
   const playerName = getPlayerNameById(game, playerId);
   logger.info({ gameId: game.id, playerId, guess }, "Dual guess");
-  io.to(game.id).emit("playerSubmitted", { playerId, playerName });
+  // Partner-only: submitter already has optimistic UI; others see "partner submitted".
+  submitter.to(game.id).emit("playerSubmitted", { playerId, playerName });
 
   const allSubmitted = activePlayerIds.length >= 2 && activePlayerIds.every((id) => round!.guesses[id]);
   if (!allSubmitted) return;
@@ -454,7 +465,7 @@ io.on("connection", (socket) => {
       return;
     }
     if (game.mode === "shared") handleSharedGuess(game, playerId, g);
-    else handleDualGuess(game, playerId, g);
+    else handleDualGuess(game, playerId, g, socket);
   });
 
   socket.on("typing", ({ gameId, player }: { gameId: string; player: string }) => {
