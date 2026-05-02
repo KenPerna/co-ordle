@@ -398,6 +398,10 @@ function handleDualGuess(game: Game, playerId: string, guess: string, submitter:
 
 // ─── Socket.IO ──────────────────────────────────────────────────────────────────
 
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 io.on("connection", (socket) => {
   logger.info({ socketId: socket.id }, "Socket connected");
   let currentRoom: string | null = null;
