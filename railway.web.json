@@ -1,0 +1,11 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile.web"
+  },
+  "deploy": {
+    "startCommand": "serve artifacts/web-app/dist -p 3000",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
