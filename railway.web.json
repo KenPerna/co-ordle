@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile.web"
+    "dockerfilePath": "Dockerfile.frontend"
   },
   "deploy": {
     "startCommand": "serve artifacts/web-app/dist -p 3000",
