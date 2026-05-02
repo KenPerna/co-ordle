@@ -9,7 +9,6 @@ RUN if [ "$BUILD_TARGET" = "web" ]; then \
     else \
       pnpm --filter @workspace/api-server run build; \
     fi
-EXPOSE 8080 3000
 CMD if [ "$BUILD_TARGET" = "web" ]; then \
       serve artifacts/web-app/dist -p 3000; \
     else \
