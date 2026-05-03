@@ -5,6 +5,7 @@
     "dockerfilePath": "Dockerfile.web"
   },
   "deploy": {
+    "startCommand": "sh -c \"exec serve artifacts/web-app/dist -l tcp://0.0.0.0:${PORT:-3000}\"",
     "restartPolicyType": "ON_FAILURE"
   }
 }

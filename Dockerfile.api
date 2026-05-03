@@ -4,4 +4,5 @@ WORKDIR /app
 COPY . .
 RUN pnpm install --no-frozen-lockfile
 RUN pnpm --filter @workspace/api-server run build
+RUN ls artifacts/api-server/dist/
 CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
