@@ -2,10 +2,9 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile"
+    "dockerfilePath": "Dockerfile.web"
   },
   "deploy": {
-    "startCommand": "node --enable-source-maps artifacts/api-server/dist/index.mjs",
     "restartPolicyType": "ON_FAILURE"
   }
 }
