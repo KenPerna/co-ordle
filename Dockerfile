@@ -9,8 +9,5 @@ RUN if [ "$BUILD_TARGET" = "web" ]; then \
     else \
       pnpm --filter @workspace/api-server run build; \
     fi
-CMD if [ "$BUILD_TARGET" = "web" ]; then \
-      serve artifacts/web-app/dist -p 3000; \
-    else \
-      node --enable-source-maps artifacts/api-server/dist/index.mjs; \
-    fi
+RUN echo "#!/bin/sh\nif [ \"$BUILD_TARGET\" = \"web\" ]; then\n  exec serve artifacts/web-app/dist -p 3000\nelse\n  exec node --enable-source-maps artifacts/api-server/dist/index.mjs\nfi" > /start.sh && chmod +x /start.sh
+CMD ["/start.sh"]
