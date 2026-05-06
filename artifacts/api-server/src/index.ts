@@ -398,10 +398,6 @@ function handleDualGuess(game: Game, playerId: string, guess: string, submitter:
 
 // ─── Socket.IO ──────────────────────────────────────────────────────────────────
 
-app.get("/healthz", (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-
 io.on("connection", (socket) => {
   logger.info({ socketId: socket.id }, "Socket connected");
   let currentRoom: string | null = null;
@@ -486,7 +482,10 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(port, (err?: Error) => {
-  if (err) { logger.error({ err }, "Error listening on port"); process.exit(1); }
+server.listen(port, "0.0.0.0", () => {
   logger.info({ port }, "Server listening");
+});
+server.on("error", (err: Error) => {
+  logger.error({ err }, "Error listening on port");
+  process.exit(1);
 });
