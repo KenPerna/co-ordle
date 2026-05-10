@@ -5,4 +5,4 @@ COPY . .
 RUN pnpm install --no-frozen-lockfile
 RUN pnpm --filter @workspace/web-app run build
 RUN npm install -g serve
-CMD ["sh", "-c", "exec serve artifacts/web-app/dist -l tcp://0.0.0.0:${PORT:-3000}"]
+CMD ["sh", "-c", "exec serve artifacts/web-app/dist/public -l tcp://0.0.0.0:${PORT:-3000}"]
