@@ -11,7 +11,7 @@ tags:
   - name: health
     description: Health operations
 paths:
-  /healthz:
+  /health:
     get:
       operationId: healthCheck
       tags: [health]
