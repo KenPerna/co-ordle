@@ -1,9 +1,0 @@
-[build]
-builder = "nixpacks"
-buildCommand = "pnpm install && cd artifacts/api-server && pnpm run build"
-
-[deploy]
-startCommand = "cd artifacts/api-server && node --enable-source-maps ./dist/index.mjs"
-healthcheckPath = "/api/health"
-healthcheckTimeout = 30
-restartPolicyType = "on_failure"
