@@ -33,6 +33,8 @@ app.get("/healthz", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+// add this line before app.use("/api", router);  // from clause 
+app.get("/", (_req, res) => res.json({ status: "ok" }));
 app.use("/api", router);
 
 export default app;
