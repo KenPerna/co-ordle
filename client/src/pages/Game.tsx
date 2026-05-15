@@ -42,7 +42,8 @@ export default function Game() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const socket = io();
+    //const socket = io();
+    const socket = io(import.meta.env.VITE_API_URL || "")
     socketRef.current = socket;
 
     socket.on("connect", () => setConnected(true));
