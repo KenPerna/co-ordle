@@ -1,0 +1,38 @@
+[33m59ef3f1[m[33m ([m[1;32mreplit-agent[m[33m)[m Improve tile animations for a more engaging user experience
+[33m025f359[m Add a demo page to showcase animations and style the keyboard
+[33m9d14886[m Add animations and evaluation logic to the game
+[33m3e81c4e[m Create a functional game component with interactive keyboard and board elements
+[33m4197dd2[m Add a game board component to display the game grid
+[33m6c7d0db[m Add new keyboard component with improved styling and functionality
+[33m4f0c3dc[m Add styling and animations for letter tiles
+[33m4a3d03f[m Add a new class-based component for letter tiles
+[33mfdfabd2[m Add separate component files for the game board tiles and keyboard
+[33md3811bb[m Preserve the last game's outcome on the end screen
+[33m47340c1[m Improve the game board's interactive input and display
+[33m0e610f0[m Improve end game messages and add bounty system
+[33m1e39f4c[m Make the game accessible directly from the root URL
+[33m63ab110[m Keep end game screen visible until player dismisses it
+[33m6b9b919[m Add Replit connectors SDK for enhanced functionality
+[33m2796783[m Ensure game boards reset immediately and points are awarded correctly
+[33m4b2995d[m Always show the secret word on the end game screen
+[33m5d50448[m Remove redundant "So close" message from game over screen
+[33m734bc6b[m Separate player guesses in dual mode to prevent information leakage
+[33md0828f7[m Adjust bonus condition for players making at least one guess
+[33mb575ab5[m Update losing message to be more collaborative and encouraging
+[33m25ab129[m Keep the end game screen visible until the player dismisses it
+[33m86568bb[m Add an on-screen keyboard with color-coded letter feedback
+[33m411964b[m Add token and reward system for player engagement
+[33mbe50394[m Add dual brain mode and enhance chat and game features
+[33m4b07f37[m Make room names easy to copy and share with friends
+[33m9561b53[m Add game rooms to allow multiple players to join a game
+[33m466bcc9[m Saved progress at the end of the loop
+[33mdc91593[m Add game state tracking and real-time updates for players
+[33m484f6b1[m Add a game to the web application at the /game route
+[33mf55faec[m Add a game interface for live word guessing
+[33m7365726[m Implement Wordle game logic and integrate into the real-time server
+[33mc3263e2[m Add functionality to evaluate user guesses in a word game
+[33m3964f8b[m Add a new file for the word engine logic
+[33m6dfd13d[m Add real-time communication for chat and guessing games
+[33m601afe3[m Add real-time communication capabilities to the application
+[33m82a8a2f[m Add a new web application with essential UI components and structure
+[33m1a6f706[m Saved progress at the end of the loop
