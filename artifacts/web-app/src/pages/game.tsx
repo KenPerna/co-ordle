@@ -435,7 +435,7 @@ export default function Game() {
     setChatMessages((prev) => [...prev, { player: "System", text, system: true }]);
 
   useEffect(() => {
-    const socket = io();
+    const socket = io(import.meta.env.VITE_API_URL ?? "");
     socketRef.current = socket;
 
     socket.on("connect", () => setConnected(true));
