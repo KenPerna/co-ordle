@@ -3,6 +3,11 @@ RUN npm install -g pnpm@9.15.9
 WORKDIR /app
 COPY . .
 RUN pnpm install --no-frozen-lockfile
+
+RUN echo "VITE_API_URL is: $VITE_API_URL"
+ARG VITE_API_URL
+RUN echo "VITE_API_URL as ARG is: $VITE_API_URL"
+
 RUN pnpm --filter @workspace/web-app run build
 RUN npm install -g serve
 ARG CACHEBUST=3
