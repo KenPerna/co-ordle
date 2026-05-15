@@ -435,7 +435,8 @@ export default function Game() {
     setChatMessages((prev) => [...prev, { player: "System", text, system: true }]);
 
   useEffect(() => {
-    const socket = io();
+    //old const socket = io();
+    const socket = io(import.meta.env.VITE_API_URL);
     socketRef.current = socket;
 
     socket.on("connect", () => setConnected(true));
@@ -576,7 +577,8 @@ export default function Game() {
   // Load career stats on mount so lobby shows them immediately
   useEffect(() => {
     const name = encodeURIComponent(playerName);
-    fetch(`${import.meta.env.BASE_URL}api/players/${playerId}?name=${name}`)
+    //fetch(`${import.meta.env.BASE_URL}api/players/${playerId}?name=${name}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/players/${playerId}?name=${name}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data) setPlayerStats(data); })
       .catch(() => {});
