@@ -948,3 +948,5 @@ const s: Record<string, React.CSSProperties> = {
   bonusBanner: { border: "1px solid #538d4e", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#86efac", marginBottom: 10, textAlign: "center" },
   tokenSection: { background: "#121213", borderRadius: 10, padding: "0 12px", marginBottom: 4 },
 };
+
+// force rebuild
