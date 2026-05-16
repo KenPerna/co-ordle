@@ -134,23 +134,25 @@ function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
             const state: TileColor = letterStates[key.toLowerCase()] ?? "empty";
             const isGray = state === "gray";
             const isWide = key === "⌫" || key === "↵";
+            const isEnter = key === "↵";
+            const isBackspace = key === "⌫";
             return (
               <button
                 key={key}
                 disabled={disabled}
-                onClick={() => { if (key === "⌫") onDelete(); else if (key === "↵") onEnter(); else onKey(key); }}
+                onClick={() => { if (isBackspace) onDelete(); else if (isEnter) onEnter(); else onKey(key); }}
                 style={{
-                  width: isWide ? 46 : 34, height: 46, borderRadius: 6, border: "none",
-                  background: state === "green" ? "#538d4e" : state === "yellow" ? "#b59f3b" : isGray ? "#1a1a1b" : "#3a3a3c",
-                  color: isGray ? "#555" : "#fff",
-                  fontWeight: 700, fontSize: isWide ? 10 : 13,
+                  width: isEnter ? 64 : isBackspace ? 46 : 34, height: 46, borderRadius: 6, border: "none",
+                  background: isEnter ? "#3b82f6" : state === "green" ? "#538d4e" : state === "yellow" ? "#b59f3b" : isGray ? "#1a1a1b" : "#3a3a3c",
+                  color: isGray && !isEnter ? "#555" : "#fff",
+                  fontWeight: 700, fontSize: isEnter ? 11 : isWide ? 10 : 13,
                   cursor: disabled ? "default" : "pointer",
-                  opacity: isGray ? 0.5 : 1,
+                  opacity: isGray && !isEnter ? 0.5 : 1,
                   fontFamily: "inherit", flexShrink: 0,
                   transition: "background 0.25s",
                 }}
               >
-                {key}
+                {isEnter ? "GUESS" : key}
               </button>
             );
           })}
