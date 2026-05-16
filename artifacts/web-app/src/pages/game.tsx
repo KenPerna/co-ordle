@@ -152,7 +152,7 @@ function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
                   color: isGray && !isEnter ? "#555" : "#fff",
                   fontWeight: 700,
                   //fontSize: "clamp(9px, 1.8vw, 14px)",
-                  fontSize: "clamp(11px, 2.5vw, 18px)",
+                  fontSize: "clamp(22px, 5vw, 36px)",
                   cursor: disabled ? "default" : "pointer",
                   opacity: isGray && !isEnter ? 0.5 : 1,
                   fontFamily: "inherit",
