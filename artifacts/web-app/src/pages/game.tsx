@@ -127,29 +127,38 @@ function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
   disabled: boolean;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center", width: "100%", marginTop: 10 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "1vw", alignItems: "center", width: "100%", marginTop: 10, padding: "0 4px", boxSizing: "border-box" }}>
       {KB_ROWS.map((row, ri) => (
-        <div key={ri} style={{ display: "flex", gap: 5 }}>
+        <div key={ri} style={{ display: "flex", gap: "1vw", width: "100%", justifyContent: "center" }}>
           {row.map((key) => {
             const state: TileColor = letterStates[key.toLowerCase()] ?? "empty";
             const isGray = state === "gray";
-            const isWide = key === "⌫" || key === "↵";
             const isEnter = key === "↵";
             const isBackspace = key === "⌫";
+            const isWide = isEnter || isBackspace;
             return (
               <button
                 key={key}
                 disabled={disabled}
                 onClick={() => { if (isBackspace) onDelete(); else if (isEnter) onEnter(); else onKey(key); }}
                 style={{
-                  width: isEnter ? 64 : isBackspace ? 46 : 34, height: 46, borderRadius: 6, border: "none",
+                  flex: isWide ? 1.6 : 1,
+                  maxWidth: isEnter ? "14vw" : isBackspace ? "10vw" : "9vw",
+                  minWidth: isEnter ? 48 : isBackspace ? 36 : 28,
+                  height: "clamp(36px, 6vw, 58px)",
+                  borderRadius: 6,
+                  border: "none",
                   background: isEnter ? "#3b82f6" : state === "green" ? "#538d4e" : state === "yellow" ? "#b59f3b" : isGray ? "#1a1a1b" : "#3a3a3c",
                   color: isGray && !isEnter ? "#555" : "#fff",
-                  fontWeight: 700, fontSize: isEnter ? 11 : isWide ? 10 : 13,
+                  fontWeight: 700,
+                  fontSize: "clamp(9px, 1.8vw, 14px)",
                   cursor: disabled ? "default" : "pointer",
                   opacity: isGray && !isEnter ? 0.5 : 1,
-                  fontFamily: "inherit", flexShrink: 0,
+                  fontFamily: "inherit",
+                  flexShrink: 0,
                   transition: "background 0.25s",
+                  padding: 0,
+                  touchAction: "manipulation",
                 }}
               >
                 {isEnter ? "GUESS" : key}
