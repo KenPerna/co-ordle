@@ -400,6 +400,7 @@ export default function Game() {
 
   const [roomInput, setRoomInput] = useState("");
   const [modeInput, setModeInput] = useState<GameMode>("shared");
+  const [difficultyInput, setDifficultyInput] = useState<"easy" | "regular" | "advanced">("regular");
   const [inRoom, setInRoom] = useState(false);
   const [gameId, setGameId] = useState("");
   const [gameMode, setGameMode] = useState<GameMode>("shared");
@@ -616,7 +617,7 @@ export default function Game() {
       savePlayerName(confirmedName);
       setPlayerName(confirmedName);
     }
-    socketRef.current.emit("joinRoom", { gameId: id, player: confirmedName, playerId, mode: modeInput });
+    socketRef.current.emit("joinRoom", { gameId: id, player: confirmedName, playerId, mode: modeInput, difficulty: difficultyInput });
   }, [roomInput, modeInput, nameInput, playerName, playerId]);
 
   const leaveRoom = useCallback(() => {
@@ -769,6 +770,16 @@ export default function Game() {
           >
             <option value="shared">Shared Mode — everyone sees all guesses</option>
             <option value="dual">Dual Brain Mode — see only your partner's colors</option>
+          </select>
+          <select
+            style={{ ...s.input, width: "100%", maxWidth: 340, marginBottom: 8, cursor: "pointer" }}
+            value={difficultyInput}
+            onChange={(e) => setDifficultyInput(e.target.value as "easy" | "regular" | "advanced")}
+            data-testid="select-difficulty"
+          >
+            <option value="easy">Easy — common everyday words</option>
+            <option value="regular">Regular — standard Wordle difficulty</option>
+            <option value="advanced">Advanced — uncommon and tricky words</option>
           </select>
           {modeInput === "dual" && (
             <p style={{ color: "#b59f3b", fontSize: 13, maxWidth: 340, textAlign: "center", margin: "0 0 12px" }}>

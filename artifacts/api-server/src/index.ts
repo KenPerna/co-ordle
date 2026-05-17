@@ -163,8 +163,8 @@ function applyTeamRewards(team: TeamData, base: ReturnType<typeof calcRewards>):
 
 // ─── Game lifecycle ─────────────────────────────────────────────────────────────
 
-function createGame(gameId: string, mode: "shared" | "dual"): Game {
-  const word = pickSecretWord().toUpperCase();
+function createGame(gameId: string, mode: "shared" | "dual", difficulty: "easy" | "regular" | "advanced" = "regular"): Game {
+  const word = pickSecretWord(difficulty).toUpperCase();
   logger.info({ gameId, word, mode }, "Game created");
   return { id: gameId, word, mode, rounds: [], players: [], playerIds: new Map(), playerSockets: new Map(), usedWords: new Set(), status: "playing", startTime: Date.now(), bountyActive: false };
 }
@@ -181,8 +181,8 @@ function resetGame(game: Game): void {
   logger.info({ gameId: game.id, word: game.word, bountyActive: game.bountyActive }, "New round");
 }
 
-function getOrCreateGame(gameId: string, mode: "shared" | "dual"): Game {
-  if (!games.has(gameId)) games.set(gameId, createGame(gameId, mode));
+function getOrCreateGame(gameId: string, mode: "shared" | "dual", difficulty: "easy" | "regular" | "advanced" = "regular"): Game {
+  if (!games.has(gameId)) games.set(gameId, createGame(gameId, mode, difficulty));
   return games.get(gameId)!;
 }
 
@@ -403,15 +403,15 @@ io.on("connection", (socket) => {
   let currentRoom: string | null = null;
   let currentPlayer: string | null = null;
 
-  socket.on("joinRoom", async ({ gameId, player, playerId, mode = "shared" }: {
-    gameId: string; player: string; playerId?: string; mode?: "shared" | "dual";
+  socket.on("joinRoom", async ({ gameId, player, playerId, mode = "shared", difficulty = "regular" }: {
+    gameId: string; player: string; playerId?: string; mode?: "shared" | "dual"; difficulty?: "easy" | "regular" | "advanced";
   }) => {
     if (currentRoom) socket.leave(currentRoom);
     currentRoom = gameId;
     currentPlayer = player;
     socket.join(gameId);
 
-    const game = getOrCreateGame(gameId, mode);
+    const game = getOrCreateGame(gameId, mode, difficulty);
     if (!game.players.includes(player)) game.players.push(player);
     game.playerSockets.set(player, socket.id);
     if (playerId) game.playerIds.set(player, playerId);
