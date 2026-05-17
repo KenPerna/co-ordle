@@ -861,7 +861,10 @@ export default function Game() {
               activeGuess={isInputDisabled ? undefined : currentGuess.split("")}
               selectedCol={selectedCol}
               onTileClick={setSelectedCol}
-              tileSize={Math.min(52, Math.floor((window.innerWidth - 48) / 5))}
+              tileSize={Math.min(
+                Math.floor((window.innerWidth - 48) / 5),
+                Math.floor((window.innerHeight * 0.38) / 6)
+              )}
             />
           ) : (
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
@@ -870,7 +873,10 @@ export default function Game() {
                 <Board
                   rounds={myBoardRows}
                   showLetters={true}
-                  tileSize={Math.min(44, Math.floor((window.innerWidth - 80) / 10))}
+                  tileSize={Math.min(
+                    Math.floor((window.innerWidth - 80) / 10),
+                    Math.floor((window.innerHeight * 0.38) / 6)
+                  )}
                   activeGuess={isInputDisabled ? undefined : currentGuess.split("")}
                   selectedCol={selectedCol}
                   onTileClick={setSelectedCol}
@@ -881,7 +887,10 @@ export default function Game() {
                 <Board
                   rounds={partnerBoardRows}
                   showLetters={false}
-                  tileSize={Math.min(44, Math.floor((window.innerWidth - 80) / 10))}
+                  tileSize={Math.min(
+                    Math.floor((window.innerWidth - 80) / 10),
+                    Math.floor((window.innerHeight * 0.38) / 6)
+                  )}
                 />
               </div>
             </div>
