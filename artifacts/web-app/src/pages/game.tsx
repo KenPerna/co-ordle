@@ -127,9 +127,9 @@ function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
   disabled: boolean;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1vw", alignItems: "center", width: "100%", marginTop: 10, padding: "0 4px", boxSizing: "border-box" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "min(1vw, 4px)", alignItems: "center", width: "100%", marginTop: 4, padding: "0 4px", boxSizing: "border-box" }}>
       {KB_ROWS.map((row, ri) => (
-        <div key={ri} style={{ display: "flex", gap: "1vw", width: "100%", justifyContent: "center" }}>
+        <div key={ri} style={{ display: "flex", gap: "min(1vw, 4px)", width: "100%", justifyContent: "center" }}>
           {row.map((key) => {
             const state: TileColor = letterStates[key.toLowerCase()] ?? "empty";
             const isGray = state === "gray";
@@ -145,14 +145,14 @@ function Keyboard({ letterStates, onKey, onDelete, onEnter, disabled }: {
                   flex: isWide ? 1.6 : 1,
                   maxWidth: isEnter ? "14vw" : isBackspace ? "10vw" : "9vw",
                   minWidth: isEnter ? 48 : isBackspace ? 36 : 28,
-                  height: "clamp(36px, 6vw, 46px)",
+                  height: "clamp(32px, 4vw, 38px)",
                   borderRadius: 6,
                   border: "none",
                   background: isEnter ? "#3b82f6" : state === "green" ? "#538d4e" : state === "yellow" ? "#b59f3b" : isGray ? "#1a1a1b" : "#3a3a3c",
                   color: isGray && !isEnter ? "#555" : "#fff",
                   fontWeight: 700,
                   //fontSize: "clamp(9px, 1.8vw, 14px)",
-                  fontSize: "clamp(22px, 5vw, 28px)",
+                  fontSize: "clamp(11px, 2.2vw, 16px)",
                   cursor: disabled ? "default" : "pointer",
                   opacity: isGray && !isEnter ? 0.5 : 1,
                   fontFamily: "inherit",
