@@ -585,7 +585,7 @@ export default function Game() {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages, typingPlayers]);
+  }, [chatMessages]);
 
   // Load career stats on mount so lobby shows them immediately
   useEffect(() => {
@@ -802,6 +802,8 @@ export default function Game() {
   }
 
   // ─── Game ────────────────────────────────────────────────────────────────────
+  const partnerName = players.find((p) => p !== playerName) ?? null;
+
   return (
     <div style={s.page}>
       <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}`}</style>
@@ -812,7 +814,7 @@ export default function Game() {
           revealWord={endGameSnapshot.revealWord}
           rewards={endGameSnapshot.rewards}
           playerName={playerName}
-          partnerName={players.find((p) => p !== playerName) ?? null}
+          partnerName={partnerName}
           playerStats={endGameSnapshot.playerStats}
           partnerStats={endGameSnapshot.partnerStats}
           teamStats={endGameSnapshot.teamStats}
@@ -835,30 +837,19 @@ export default function Game() {
         />
       )}
 
+      {/* ── Header ── */}
       <header style={s.header}>
         <h1 style={s.title}>Co-Ordle</h1>
         <span style={{ ...s.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
-        <span style={{ ...s.roomTag, userSelect: "all", cursor: "text" }} title="Tap to copy room name">{gameId}</span>
-        <span style={{ fontSize: 11, color: "#818384" }}>{gameMode === "dual" ? "DUAL" : "SHARED"}</span>
-        {/* Token display */}
-        <div style={s.tokenBadge} title="Intelligence tokens">
-          <span style={{ color: "#538d4e" }}>🧠</span>
-          <span style={{ fontWeight: 700, fontSize: 13 }}>{teamTotal.intelligence}</span>
-        </div>
-        <div style={s.tokenBadge} title="Coins">
-          <span style={{ color: "#b59f3b" }}>🪙</span>
-          <span style={{ fontWeight: 700, fontSize: 13 }}>{teamTotal.coins}</span>
-        </div>
-        {teamTotal.streak > 0 && (
-          <div style={{ ...s.tokenBadge, color: "#f97316" }} title="Day streak">
-            <span>🔥</span>
-            <span style={{ fontWeight: 700, fontSize: 13 }}>{teamTotal.streak}</span>
-          </div>
-        )}
-        <button style={s.leaveBtn} onClick={leaveRoom} data-testid="button-leave">Leave</button>
-        <span style={{ ...s.playerTag, color: playerColor(playerName) }}>{playerName}</span>
+        <span style={s.roomTag}>{gameId}</span>
+        <span style={{ fontSize: 10, color: "#818384", flexShrink: 0 }}>{gameMode === "dual" ? "DUAL" : "SHARED"}</span>
+        <div style={s.tokenBadge}><span style={{ color: "#538d4e" }}>🧠</span><span style={{ fontWeight: 700 }}>{teamTotal.intelligence}</span></div>
+        <div style={s.tokenBadge}><span style={{ color: "#b59f3b" }}>🪙</span><span style={{ fontWeight: 700 }}>{teamTotal.coins}</span></div>
+        {teamTotal.streak > 0 && <div style={{ ...s.tokenBadge, color: "#f97316" }}><span>🔥</span><span style={{ fontWeight: 700 }}>{teamTotal.streak}</span></div>}
+        <button style={s.leaveBtn} onClick={leaveRoom}>Leave</button>
       </header>
 
+      {/* ── Game area ── */}
       <div style={s.main}>
         <section style={s.gameSection}>
           {wordError && <div style={s.wordError}>{wordError}</div>}
@@ -870,15 +861,16 @@ export default function Game() {
               activeGuess={isInputDisabled ? undefined : currentGuess.split("")}
               selectedCol={selectedCol}
               onTileClick={setSelectedCol}
+              tileSize={Math.min(52, Math.floor((window.innerWidth - 48) / 5))}
             />
           ) : (
-            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center" }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
               <div>
                 <p style={s.boardLabel}>Your Board</p>
                 <Board
                   rounds={myBoardRows}
                   showLetters={true}
-                  tileSize={48}
+                  tileSize={Math.min(44, Math.floor((window.innerWidth - 80) / 10))}
                   activeGuess={isInputDisabled ? undefined : currentGuess.split("")}
                   selectedCol={selectedCol}
                   onTileClick={setSelectedCol}
@@ -886,7 +878,11 @@ export default function Game() {
               </div>
               <div>
                 <p style={s.boardLabel}>Partner Insight</p>
-                <Board rounds={partnerBoardRows} showLetters={false} tileSize={48} />
+                <Board
+                  rounds={partnerBoardRows}
+                  showLetters={false}
+                  tileSize={Math.min(44, Math.floor((window.innerWidth - 80) / 10))}
+                />
               </div>
             </div>
           )}
@@ -900,9 +896,17 @@ export default function Game() {
           />
         </section>
 
-        <section style={s.chatSection}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-            <h2 style={s.chatTitle}>Chat</h2>
+        {/* ── Chat strip ── */}
+        <div style={s.chatStrip}>
+          <div style={s.chatHeader}>
+            <h2 style={s.chatTitle}>
+              Chat
+              {typingPlayers.length > 0 && (
+                <span style={{ color: "#538d4e", marginLeft: 6, fontStyle: "italic", textTransform: "none", letterSpacing: 0 }}>
+                  {typingPlayers.join(", ")} typing…
+                </span>
+              )}
+            </h2>
             <div style={{ display: "flex", gap: 6 }}>
               {players.map((p) => (
                 <span key={p} style={{ fontSize: 11, color: playerColor(p), fontWeight: 700 }}>{p}</span>
@@ -918,54 +922,49 @@ export default function Game() {
                 <span style={{ color: msg.system ? "#818384" : "#ddd" }}>{msg.text}</span>
               </div>
             ))}
-            {typingPlayers.length > 0 && (
-              <div style={{ color: "#818384", fontSize: 12, fontStyle: "italic" }}>
-                {typingPlayers.join(", ")} typing...
-              </div>
-            )}
             <div ref={chatEndRef} />
           </div>
           <div style={s.inputRow}>
             <input
-              style={{ ...s.input, flex: 1, minWidth: 0 }}
+              style={{ ...s.input, flex: 1, minWidth: 0, padding: "8px 10px", fontSize: 14 }}
               value={chatInput}
-              placeholder="Say something..."
+              placeholder="Say something…"
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendChat()}
-              data-testid="input-chat"
             />
-            <button style={s.btn} onClick={sendChat} data-testid="button-chat">Send</button>
+            <button style={{ ...s.btn, padding: "8px 12px" }} onClick={sendChat}>Send</button>
           </div>
-        </section>
+        </div>
       </div>
     </div>
   );
 }
 
 const s: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100vh", background: "#121213", color: "#fff", fontFamily: "'Inter', 'Segoe UI', sans-serif", display: "flex", flexDirection: "column" },
-  header: { display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: "1px solid #2a2a2c", flexWrap: "wrap" },
-  title: { margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: 3, textTransform: "uppercase" },
-  dot: { width: 9, height: 9, borderRadius: "50%", display: "inline-block", flexShrink: 0 },
-  roomTag: { fontSize: 13, color: "#538d4e", fontWeight: 700 },
-  tokenBadge: { display: "flex", alignItems: "center", gap: 4, background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 20, padding: "3px 9px", fontSize: 12, color: "#ccc" },
-  leaveBtn: { marginLeft: "auto", padding: "6px 12px", borderRadius: 8, border: "1px solid #3a3a3c", background: "transparent", color: "#818384", fontSize: 13, cursor: "pointer" },
-  playerTag: { fontSize: 13, fontWeight: 700 },
-  lobby: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 },
+  page: { height: "100dvh", background: "#121213", color: "#fff", fontFamily: "'Inter','Segoe UI',sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" },
+  header: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderBottom: "1px solid #2a2a2c", flexWrap: "nowrap", overflow: "hidden", flexShrink: 0 },
+  title: { margin: 0, fontSize: 15, fontWeight: 800, letterSpacing: 3, textTransform: "uppercase", flexShrink: 0 },
+  dot: { width: 8, height: 8, borderRadius: "50%", display: "inline-block", flexShrink: 0 },
+  roomTag: { fontSize: 12, color: "#538d4e", fontWeight: 700, flexShrink: 0 },
+  tokenBadge: { display: "flex", alignItems: "center", gap: 3, background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 20, padding: "2px 7px", fontSize: 11, color: "#ccc", flexShrink: 0 },
+  leaveBtn: { marginLeft: "auto", padding: "4px 10px", borderRadius: 8, border: "1px solid #3a3a3c", background: "transparent", color: "#818384", fontSize: 12, cursor: "pointer", flexShrink: 0 },
+  playerTag: { fontSize: 12, fontWeight: 700, flexShrink: 0 },
+  lobby: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, overflowY: "auto" },
   lobbyTitle: { margin: "0 0 24px", fontSize: 26, fontWeight: 800 },
-  main: { display: "flex", flex: 1, gap: 20, padding: 16, flexWrap: "wrap" },
-  gameSection: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, minWidth: 280 },
-  statusText: { fontSize: 14, color: "#818384", margin: 0, textAlign: "center" },
-  boardLabel: { fontSize: 12, color: "#818384", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 8px", textAlign: "center" },
-  inputRow: { display: "flex", gap: 8, width: "100%", maxWidth: 360 },
-  input: { padding: "13px 14px", borderRadius: 10, border: "1px solid #3a3a3c", background: "#1a1a1b", color: "#fff", fontSize: 16, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
-  btn: { padding: "13px 18px", borderRadius: 10, border: "none", background: "#538d4e", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", whiteSpace: "nowrap" },
-  chatSection: { display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 200, maxWidth: 240 },
-  chatTitle: { margin: 0, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#818384" },
-  chatBox: { flex: 1, minHeight: 260, maxHeight: 400, overflowY: "auto", background: "#1a1a1b", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 5, border: "1px solid #2a2a2c" },
-  chatMsg: { fontSize: 14, lineHeight: 1.5, wordBreak: "break-word" },
-  wordError: { background: "#2a1a1a", border: "1px solid #b59f3b", color: "#b59f3b", borderRadius: 8, padding: "7px 12px", fontSize: 13, animation: "fadeIn 0.2s ease" },
-  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 },
+  main: { display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" },
+  gameSection: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flex: 1, padding: "6px 8px 4px", overflow: "hidden" },
+  statusText: { fontSize: 13, color: "#818384", margin: 0, textAlign: "center", flexShrink: 0 },
+  boardLabel: { fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 4px", textAlign: "center" },
+  inputRow: { display: "flex", gap: 6, width: "100%" },
+  input: { padding: "10px 12px", borderRadius: 10, border: "1px solid #3a3a3c", background: "#1a1a1b", color: "#fff", fontSize: 15, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
+  btn: { padding: "10px 14px", borderRadius: 10, border: "none", background: "#538d4e", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", whiteSpace: "nowrap" },
+  chatStrip: { flexShrink: 0, borderTop: "1px solid #2a2a2c", background: "#0e0e0f", padding: "6px 10px 8px", display: "flex", flexDirection: "column", gap: 4 },
+  chatHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
+  chatTitle: { margin: 0, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#818384" },
+  chatBox: { height: "4.5em", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 },
+  chatMsg: { fontSize: 13, lineHeight: 1.4, wordBreak: "break-word" },
+  wordError: { background: "#2a1a1a", border: "1px solid #b59f3b", color: "#b59f3b", borderRadius: 8, padding: "5px 10px", fontSize: 12, flexShrink: 0 },
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16, overflowY: "auto" },
   resultCard: { background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 420 },
   statsRow: { display: "flex", gap: 8, marginBottom: 14 },
   bonusBanner: { border: "1px solid #538d4e", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#86efac", marginBottom: 10, textAlign: "center" },
