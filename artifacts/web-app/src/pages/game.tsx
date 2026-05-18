@@ -94,7 +94,7 @@ function Board({ rounds, maxRows = ROWS, cols = COLS, showLetters = true, tileSi
   const activeRowIndex = rounds.length;
   const rows = [...rounds, ...Array(Math.max(0, maxRows - rounds.length)).fill({ letters: [], colors: [] })];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${tileSize}px)`, gap: 5 }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${tileSize}px)`, gap: "clamp(3px, 0.8vw, 5px)" }}>
       {rows.slice(0, maxRows).map((row, ri) =>
         Array.from({ length: cols }).map((_, ci) => {
           const isActiveRow = ri === activeRowIndex && activeGuess != null;
@@ -238,10 +238,10 @@ function RewardScreen({ status, revealWord, rewards, playerName, partnerName, pl
       <div style={s.resultCard} className="result-card">
         {/* Title */}
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          {won ? (
+        {won ? (
             <>
-              <div style={{ fontSize: 40, marginBottom: 4 }}>🎉</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#538d4e", animation: "pulse 1.2s ease-in-out infinite" }}>
+              <div style={{ fontSize: 28, marginBottom: 2 }}>🎉</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#538d4e", animation: "pulse 1.2s ease-in-out infinite" }}>
                 Puzzle Solved!
               </div>
               {rewards?.greatTeamwork && (
@@ -254,17 +254,17 @@ function RewardScreen({ status, revealWord, rewards, playerName, partnerName, pl
                   🎯 BOUNTY CASHED — 2× REWARDS EARNED!
                 </div>
               )}
-              <div style={{ fontSize: 14, color: "#818384", marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: "#818384", marginTop: 3 }}>
                 {hasPartner ? "You solved it together — incredible!" : "You cracked it — well done!"}
               </div>
             </>
           ) : (
             <>
-              <div style={{ fontSize: 40, marginBottom: 4 }}>💪</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#fff" }}>
+              <div style={{ fontSize: 28, marginBottom: 2 }}>💪</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#fff" }}>
                 So Close!
               </div>
-              <div style={{ fontSize: 14, color: "#818384", marginTop: 6 }}>
+              <<div style={{ fontSize: 12, color: "#818384", marginTop: 3 }}>
                 {rewards?.greatTeamwork
                   ? "Amazing effort from both of you — keep it up!"
                   : "You'll crack the next one — don't give up!"}
@@ -272,7 +272,7 @@ function RewardScreen({ status, revealWord, rewards, playerName, partnerName, pl
             </>
           )}
           {/* Always show the secret word */}
-          <div style={{ marginTop: 10, fontSize: 14, color: "#818384" }}>
+          <div style={{ marginTop: 6, fontSize: 13, color: "#818384" }}>
             The word was{" "}
             <span style={{ color: "#b59f3b", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
               {revealWord}
@@ -342,7 +342,7 @@ function RewardScreen({ status, revealWord, rewards, playerName, partnerName, pl
         )}
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <div style={{ ...s.btn, flex: 1, textAlign: "center", background: "#1a1a1b", border: "1px solid #3a3a3c", cursor: "pointer", color: "#818384", fontSize: 14 }}
             onClick={onLeave}>
             Leave Room
@@ -370,28 +370,27 @@ function RewardScreen({ status, revealWord, rewards, playerName, partnerName, pl
 
 function StatBox({ label, value, accent = "#fff" }: { label: string; value: string; accent?: string }) {
   return (
-    <div style={{ flex: 1, textAlign: "center", background: "#1a1a1b", borderRadius: 8, padding: "10px 4px" }}>
-      <div style={{ fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: accent, marginTop: 2 }}>{value}</div>
+    <div style={{ flex: 1, textAlign: "center", background: "#1a1a1b", borderRadius: 8, padding: "6px 4px" }}>
+      <div style={{ fontSize: 10, color: "#818384", textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: accent, marginTop: 1, whiteSpace: "nowrap" }}>{value}</div>
     </div>
   );
 }
 
 function TokenRow({ icon, label, earned, total, color }: { icon: string; label: string; earned: number; total: number; color: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #2a2a2c" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 20 }}>{icon}</span>
-        <span style={{ fontSize: 14, color: "#ccc" }}>{label}</span>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2a2a2c" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 16 }}>{icon}</span>
+        <span style={{ fontSize: 13, color: "#ccc" }}>{label}</span>
       </div>
       <div style={{ textAlign: "right" }}>
-        <span style={{ fontSize: 20, fontWeight: 800, color }}>+{earned}</span>
-        <span style={{ fontSize: 11, color: "#818384", marginLeft: 8 }}>Total: {total}</span>
+        <span style={{ fontSize: 16, fontWeight: 800, color }}>+{earned}</span>
+        <span style={{ fontSize: 11, color: "#818384", marginLeft: 6 }}>Total: {total}</span>
       </div>
     </div>
   );
 }
-
 export default function Game() {
   // ── Persistent identity ──────────────────────────────────────────────────────
   const [playerId] = useState(() => getOrCreatePlayerId());
@@ -974,10 +973,10 @@ const s: Record<string, React.CSSProperties> = {
   chatMsg: { fontSize: 13, lineHeight: 1.4, wordBreak: "break-word" },
   wordError: { background: "#2a1a1a", border: "1px solid #b59f3b", color: "#b59f3b", borderRadius: 8, padding: "5px 10px", fontSize: 12, flexShrink: 0 },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16, overflowY: "auto" },
-  resultCard: { background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 420 },
-  statsRow: { display: "flex", gap: 8, marginBottom: 14 },
-  bonusBanner: { border: "1px solid #538d4e", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#86efac", marginBottom: 10, textAlign: "center" },
-  tokenSection: { background: "#121213", borderRadius: 10, padding: "0 12px", marginBottom: 4 },
+  resultCard: { background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 16, padding: "16px 16px", width: "100%", maxWidth: 420, overflowY: "auto", maxHeight: "90dvh" },
+  statsRow: { display: "flex", gap: 6, marginBottom: 8 },
+  bonusBanner: { border: "1px solid #538d4e", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: "#86efac", marginBottom: 6, textAlign: "center" },
+  tokenSection: { background: "#121213", borderRadius: 10, padding: "0 10px", marginBottom: 2 },
 };
 
 // force rebuild
