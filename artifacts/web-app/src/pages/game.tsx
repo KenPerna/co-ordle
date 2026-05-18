@@ -264,7 +264,7 @@ function RewardScreen({ status, revealWord, rewards, playerName, partnerName, pl
               <div style={{ fontSize: 24, fontWeight: 900, color: "#fff" }}>
                 So Close!
               </div>
-              <<div style={{ fontSize: 12, color: "#818384", marginTop: 3 }}>
+              <div style={{ fontSize: 12, color: "#818384", marginTop: 3 }}>
                 {rewards?.greatTeamwork
                   ? "Amazing effort from both of you — keep it up!"
                   : "You'll crack the next one — don't give up!"}
