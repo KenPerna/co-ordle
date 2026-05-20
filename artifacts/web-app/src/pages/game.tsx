@@ -59,6 +59,17 @@ function savePlayerName(name: string): void {
   localStorage.setItem("coOrdle_playerName", name);
 }
 
+
+const ADJECTIVES = ["TIGER","COBRA","STORM","BLAZE","FROST","LUNAR","SOLAR","SWIFT","BRAVE","NOBLE","CHAOS","CRISP","DIZZY","EAGER","FANCY","QUIRKY","RAPID","SHINY","ULTRA","VIVID"];
+const NOUNS = ["ACE","BAT","CAT","DOG","ELK","FOX","GNU","HEN","IMP","JAY","KOI","LAB","MOB","NAP","OWL","PIG","RAT","SOW","TAN","URN"];
+
+function generateRoomCode(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]!;
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)]!;
+  const num = Math.floor(Math.random() * 90 + 10);
+  return `${adj}-${noun}-${num}`;
+}
+
 const TILE_BG: Record<TileColor, string> = {
   green: "#538d4e", yellow: "#b59f3b", gray: "#3a3a3c", empty: "#121213", pending: "#2a2a2c",
 };
@@ -397,7 +408,9 @@ export default function Game() {
   const [nameInput, setNameInput] = useState(() => getStoredPlayerName());
   const [playerName, setPlayerName] = useState(() => getStoredPlayerName() || `Player${Math.floor(Math.random() * 900 + 100)}`);
 
+  const [lobbyMode, setLobbyMode] = useState<"pick" | "create" | "join">("pick");
   const [roomInput, setRoomInput] = useState("");
+  const [generatedCode, setGeneratedCode] = useState(() => generateRoomCode());
   const [modeInput, setModeInput] = useState<GameMode>("shared");
   const [difficultyInput, setDifficultyInput] = useState<"easy" | "regular" | "advanced">("regular");
   const [inRoom, setInRoom] = useState(false);
@@ -596,8 +609,9 @@ export default function Game() {
       .catch(() => {});
   }, [playerId, playerName]);
 
+
   const joinRoom = useCallback(() => {
-    const id = roomInput.trim();
+    const id = lobbyMode === "create" ? generatedCode : roomInput.trim();
     if (!id || !socketRef.current) return;
     setGameId(id);
     setGameMode(modeInput);
@@ -617,7 +631,7 @@ export default function Game() {
       setPlayerName(confirmedName);
     }
     socketRef.current.emit("joinRoom", { gameId: id, player: confirmedName, playerId, mode: modeInput, difficulty: difficultyInput });
-  }, [roomInput, modeInput, nameInput, playerName, playerId]);
+  }, [roomInput, modeInput, nameInput, playerName, playerId, lobbyMode, generatedCode, difficultyInput]);
 
   const leaveRoom = useCallback(() => {
     setInRoom(false);
@@ -630,6 +644,7 @@ export default function Game() {
     setEndGameSnapshot(null);
     setGameStatus("playing");
     setShowRewardScreen(false);
+    setLobbyMode("pick");
   }, []);
 
   const submitGuess = useCallback(() => {
@@ -728,73 +743,161 @@ export default function Game() {
           <span style={{ ...s.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
         </header>
         <div style={s.lobby}>
-          <h2 style={s.lobbyTitle}>Join a Game Room</h2>
 
-          {/* Player name */}
-          <div style={{ width: "100%", maxWidth: 340, marginBottom: 12 }}>
-            <label style={{ fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1, display: "block", marginBottom: 4 }}>
-              Your Name
-            </label>
+          {/* Player name — always visible */}
+          <div style={{ width: "100%", maxWidth: 340, marginBottom: 20 }}>
+            <label style={s.lobbyLabel}>Your Name</label>
             <input
-              style={{ ...s.input, width: "100%" }}
+              style={{ ...s.input, width: "100%", boxSizing: "border-box" }}
               value={nameInput}
               placeholder="Enter your display name"
               onChange={(e) => setNameInput(e.target.value)}
               onBlur={() => { if (nameInput.trim()) { savePlayerName(nameInput.trim()); setPlayerName(nameInput.trim()); }}}
-              data-testid="input-name"
             />
           </div>
 
-          {/* Room name */}
-          <div style={{ width: "100%", maxWidth: 340, marginBottom: 12 }}>
-            <label style={{ fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1, display: "block", marginBottom: 4 }}>
-              Room Name
-            </label>
-            <input
-              style={{ ...s.input, width: "100%" }}
-              value={roomInput}
-              placeholder="Share with your partner to play together"
-              onChange={(e) => setRoomInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && joinRoom()}
-              data-testid="input-room"
-              autoFocus
-            />
-          </div>
-
-          <select
-            style={{ ...s.input, width: "100%", maxWidth: 340, marginBottom: 8, cursor: "pointer" }}
-            value={modeInput}
-            onChange={(e) => setModeInput(e.target.value as GameMode)}
-            data-testid="select-mode"
-          >
-            <option value="shared">Shared Mode — everyone sees all guesses</option>
-            <option value="dual">Dual Brain Mode — see only your partner's colors</option>
-          </select>
-          <select
-            style={{ ...s.input, width: "100%", maxWidth: 340, marginBottom: 8, cursor: "pointer" }}
-            value={difficultyInput}
-            onChange={(e) => setDifficultyInput(e.target.value as "easy" | "regular" | "advanced")}
-            data-testid="select-difficulty"
-          >
-            <option value="easy">Easy — common everyday words</option>
-            <option value="regular">Regular — standard Wordle difficulty</option>
-            <option value="advanced">Advanced — uncommon and tricky words</option>
-          </select>
-          {modeInput === "dual" && (
-            <p style={{ color: "#b59f3b", fontSize: 13, maxWidth: 340, textAlign: "center", margin: "0 0 12px" }}>
-              You'll only see your partner's color clues — not their guesses. Talk it out.
-            </p>
+          {/* Create / Join toggle */}
+          {lobbyMode === "pick" && (
+            <>
+              <h2 style={s.lobbyTitle}>What would you like to do?</h2>
+              <div style={{ display: "flex", gap: 12, width: "100%", maxWidth: 340 }}>
+                <button
+                  style={{ ...s.btn, flex: 1, fontSize: 15, padding: "16px 0", background: "#538d4e" }}
+                  onClick={() => { setGeneratedCode(generateRoomCode()); setLobbyMode("create"); }}
+                >
+                  🎮 Create Game
+                </button>
+                <button
+                  style={{ ...s.btn, flex: 1, fontSize: 15, padding: "16px 0", background: "#3b82f6" }}
+                  onClick={() => setLobbyMode("join")}
+                >
+                  🔗 Join Game
+                </button>
+              </div>
+            </>
           )}
-          <button style={{ ...s.btn, width: "100%", maxWidth: 340, fontSize: 17, padding: "14px 0" }} onClick={joinRoom} data-testid="button-join">
-            Join Room
-          </button>
 
-          {/* Career stats preview */}
-          {playerStats && (
+          {/* Create flow */}
+          {lobbyMode === "create" && (
+            <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h2 style={s.lobbyTitle}>Create a Game</h2>
+
+              {/* Room code display */}
+              <div>
+                <label style={s.lobbyLabel}>Your Room Code</label>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ ...s.input, flex: 1, fontWeight: 800, letterSpacing: 2, fontSize: 17, color: "#538d4e", boxSizing: "border-box" }}>
+                    {generatedCode}
+                  </div>
+                  <button
+                    style={{ ...s.btn, padding: "12px 14px", background: "#2a2a2c", fontSize: 18 }}
+                    title="Generate new code"
+                    onClick={() => setGeneratedCode(generateRoomCode())}
+                  >
+                    🔄
+                  </button>
+                </div>
+                <p style={{ fontSize: 12, color: "#818384", margin: "6px 0 0" }}>
+                  Share this code with your partner so they can join.
+                </p>
+              </div>
+
+              {/* Game mode */}
+              <div>
+                <label style={s.lobbyLabel}>Game Mode</label>
+                <select
+                  style={{ ...s.input, width: "100%", boxSizing: "border-box", cursor: "pointer" }}
+                  value={modeInput}
+                  onChange={(e) => setModeInput(e.target.value as GameMode)}
+                >
+                  <option value="shared">Shared — everyone sees all guesses</option>
+                  <option value="dual">Dual Brain — see only your partner's colors</option>
+                </select>
+                {modeInput === "dual" && (
+                  <p style={{ fontSize: 12, color: "#b59f3b", margin: "6px 0 0" }}>
+                    You'll only see your partner's color clues — not their letters. Talk it out!
+                  </p>
+                )}
+              </div>
+
+              {/* Difficulty */}
+              <div>
+                <label style={s.lobbyLabel}>Difficulty</label>
+                <select
+                  style={{ ...s.input, width: "100%", boxSizing: "border-box", cursor: "pointer" }}
+                  value={difficultyInput}
+                  onChange={(e) => setDifficultyInput(e.target.value as "easy" | "regular" | "advanced")}
+                >
+                  <option value="easy">Easy — common everyday words</option>
+                  <option value="regular">Regular — standard Wordle difficulty</option>
+                  <option value="advanced">Advanced — uncommon and tricky words</option>
+                </select>
+              </div>
+
+              <button
+                style={{ ...s.btn, width: "100%", fontSize: 17, padding: "14px 0", marginTop: 4 }}
+                onClick={joinRoom}
+              >
+                Launch Game
+              </button>
+              <button
+                style={{ background: "none", border: "none", color: "#818384", fontSize: 13, cursor: "pointer", textAlign: "center", padding: "4px 0" }}
+                onClick={() => setLobbyMode("pick")}
+              >
+                ← Back
+              </button>
+            </div>
+          )}
+
+          {/* Join flow */}
+          {lobbyMode === "join" && (
+            <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h2 style={s.lobbyTitle}>Join a Game</h2>
+
+              <div>
+                <label style={s.lobbyLabel}>Room Code</label>
+                <input
+                  style={{ ...s.input, width: "100%", boxSizing: "border-box", letterSpacing: 2, fontWeight: 700 }}
+                  value={roomInput}
+                  placeholder="e.g. TIGER-ACE-42"
+                  onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === "Enter" && joinRoom()}
+                  autoFocus
+                />
+                <p style={{ fontSize: 12, color: "#818384", margin: "6px 0 0" }}>
+                  Ask the game creator for their room code.
+                </p>
+              </div>
+
+              <button
+                style={{ ...s.btn, width: "100%", fontSize: 17, padding: "14px 0", background: "#3b82f6" }}
+                onClick={joinRoom}
+              >
+                Join Room
+              </button>
+              <button
+                style={{ background: "none", border: "none", color: "#818384", fontSize: 13, cursor: "pointer", textAlign: "center", padding: "4px 0" }}
+                onClick={() => setLobbyMode("pick")}
+              >
+                ← Back
+              </button>
+
+              {/* Career stats */}
+              {playerStats && (
+                <div style={{ marginTop: 8 }}>
+                  <PlayerStatCard stats={playerStats} label="Your Career Stats" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Career stats on pick screen */}
+          {lobbyMode === "pick" && playerStats && (
             <div style={{ width: "100%", maxWidth: 340, marginTop: 20 }}>
               <PlayerStatCard stats={playerStats} label="Your Career Stats" />
             </div>
           )}
+
         </div>
       </div>
     );
@@ -958,6 +1061,7 @@ const s: Record<string, React.CSSProperties> = {
   leaveBtn: { marginLeft: "auto", padding: "4px 10px", borderRadius: 8, border: "1px solid #3a3a3c", background: "transparent", color: "#818384", fontSize: 12, cursor: "pointer", flexShrink: 0 },
   playerTag: { fontSize: 12, fontWeight: 700, flexShrink: 0 },
   lobby: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, overflowY: "auto" },
+  lobbyLabel: { fontSize: 11, color: "#818384", textTransform: "uppercase" as const, letterSpacing: 1, display: "block", marginBottom: 6 },
   lobbyTitle: { margin: "0 0 24px", fontSize: 26, fontWeight: 800 },
   main: { display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" },
   gameSection: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flex: 1, padding: "6px 8px 4px", overflow: "hidden" },
