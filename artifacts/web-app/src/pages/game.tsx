@@ -352,10 +352,10 @@ function RewardScreen({ status, revealWord, rewards, playerName, partnerName, pl
           <TeamSessionCard stats={teamStats} p1Name={playerName} p2Name={partnerStats.displayName} />
         )}
 
-        {/* Actions */}
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <div style={{ ...s.btn, flex: 1, textAlign: "center", background: "#1a1a1b", border: "1px solid #3a3a3c", cursor: "pointer", color: "#818384", fontSize: 14 }}
             onClick={onLeave}>
+              {/* Actions */}
             Leave Room
           </div>
           {!won && bountyNextRound ? (
@@ -1083,4 +1083,4 @@ const s: Record<string, React.CSSProperties> = {
   tokenSection: { background: "#121213", borderRadius: 10, padding: "0 10px", marginBottom: 2 },
 };
 
-// force rebuild
+// force rebuild 2
