@@ -1076,15 +1076,26 @@ export default function Game() {
       )}
 
       {/* ── Header ── */}
-      <header style={s.header}>
-        <h1 style={s.title}>Co-Ordle</h1>
-        <span style={{ ...s.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
-        <span style={s.roomTag}>{gameId}</span>
-        <span style={{ fontSize: 10, color: "#818384", flexShrink: 0 }}>{gameMode === "dual" ? "DUAL" : "SHARED"}</span>
-        <div style={s.tokenBadge}><span style={{ color: "#538d4e" }}>🧠</span><span style={{ fontWeight: 700 }}>{teamTotal.intelligence}</span></div>
-        <div style={s.tokenBadge}><span style={{ color: "#b59f3b" }}>🪙</span><span style={{ fontWeight: 700 }}>{teamTotal.coins}</span></div>
-        {teamTotal.streak > 0 && <div style={{ ...s.tokenBadge, color: "#f97316" }}><span>🔥</span><span style={{ fontWeight: 700 }}>{teamTotal.streak}</span></div>}
-        <button style={s.leaveBtn} onClick={leaveRoom}>Leave</button>
+      <header style={{ ...s.header, flexDirection: "column", gap: 4, padding: "6px 12px" }}>
+        {/* Row 1: logo + room + mode + leave */}
+        <div style={{ display: "flex", alignItems: "center", width: "100%", gap: 8 }}>
+          <h1 style={s.title}>Co-Ordle</h1>
+          <span style={{ ...s.dot, background: connected ? "#538d4e" : "#3a3a3c" }} />
+          <span style={s.roomTag}>{gameId}</span>
+          <span style={{ fontSize: 10, color: "#818384", flexShrink: 0, background: "#2a2a2c", borderRadius: 4, padding: "2px 6px" }}>
+            {gameMode === "dual" ? "DUAL" : "SHARED"}
+          </span>
+          <button style={{ ...s.leaveBtn, marginLeft: "auto" }} onClick={leaveRoom}>Leave</button>
+        </div>
+        {/* Row 2: player name + tokens */}
+        <div style={{ display: "flex", alignItems: "center", width: "100%", gap: 8 }}>
+          <span style={{ ...s.playerTag, color: playerColor(playerName), fontSize: 12 }}>👤 {playerName}</span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <div style={s.tokenBadge}><span>🧠</span><span style={{ fontWeight: 700 }}>{teamTotal.intelligence}</span></div>
+            <div style={s.tokenBadge}><span>🪙</span><span style={{ fontWeight: 700 }}>{teamTotal.coins}</span></div>
+            {teamTotal.streak > 0 && <div style={{ ...s.tokenBadge, color: "#f97316" }}><span>🔥</span><span style={{ fontWeight: 700 }}>{teamTotal.streak}</span></div>}
+          </div>
+        </div>
       </header>
 
       {/* ── Game area ── */}
@@ -1189,7 +1200,7 @@ export default function Game() {
 
 const s: Record<string, React.CSSProperties> = {
   page: { height: "100dvh", background: "#121213", color: "#fff", fontFamily: "'Inter','Segoe UI',sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" },
-  header: { display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderBottom: "1px solid #2a2a2c", flexWrap: "nowrap", overflow: "hidden", flexShrink: 0 },
+  header: { display: "flex", flexDirection: "column", gap: 4, padding: "6px 12px", borderBottom: "1px solid #2a2a2c", flexShrink: 0 },
   title: { margin: 0, fontSize: 15, fontWeight: 800, letterSpacing: 3, textTransform: "uppercase", flexShrink: 0 },
   dot: { width: 8, height: 8, borderRadius: "50%", display: "inline-block", flexShrink: 0 },
   roomTag: { fontSize: 12, color: "#538d4e", fontWeight: 700, flexShrink: 0 },
