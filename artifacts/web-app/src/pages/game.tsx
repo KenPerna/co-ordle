@@ -816,8 +816,7 @@ export default function Game() {
             >
               🎲 Browse Open Games
             </button>
-              </div>
-            </>
+          </>
           )}
 
           {/* Create flow */}

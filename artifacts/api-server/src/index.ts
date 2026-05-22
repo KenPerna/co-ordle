@@ -3,12 +3,39 @@ import { Server, type Socket } from "socket.io";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { evaluateGuess, isValidGuessWord, pickSecretWord } from "./game/wordEngine";
-import { upsertPlayer, getPlayer, updatePlayerStats, upsertTeamSession, getTeamSession } from "./db";
+import { pool, upsertPlayer, getPlayer, updatePlayerStats, upsertTeamSession, getTeamSession } from "./db";
 
 const rawPort = process.env["PORT"];
 if (!rawPort) throw new Error("PORT environment variable is required but was not provided.");
 const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) throw new Error(`Invalid PORT value: "${rawPort}"`);
+
+// Run migrations on startup
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS players (
+    id               TEXT PRIMARY KEY,
+    display_name     TEXT NOT NULL,
+    intelligence     INTEGER NOT NULL DEFAULT 0,
+    coins            INTEGER NOT NULL DEFAULT 0,
+    games_played     INTEGER NOT NULL DEFAULT 0,
+    games_won        INTEGER NOT NULL DEFAULT 0,
+    current_streak   INTEGER NOT NULL DEFAULT 0,
+    best_streak      INTEGER NOT NULL DEFAULT 0,
+    last_played      DATE
+  );
+  CREATE TABLE IF NOT EXISTS team_sessions (
+    id                  SERIAL PRIMARY KEY,
+    player1_id          TEXT NOT NULL REFERENCES players(id),
+    player2_id          TEXT NOT NULL REFERENCES players(id),
+    games_played        INTEGER NOT NULL DEFAULT 0,
+    games_won           INTEGER NOT NULL DEFAULT 0,
+    intelligence_earned INTEGER NOT NULL DEFAULT 0,
+    coins_earned        INTEGER NOT NULL DEFAULT 0,
+    last_played         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (player1_id, player2_id)
+  );
+`).then(() => logger.info("DB migrations OK"))
+.catch((err: unknown) => logger.error({ err }, "DB migration failed"));
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -185,9 +212,9 @@ function resetGame(game: Game): void {
 
 function getOrCreateGame(gameId: string, mode: "shared" | "dual", difficulty: "easy" | "regular" | "advanced" = "regular", isOpen: boolean = false): Game {
   if (!games.has(gameId)) games.set(gameId, createGame(gameId, mode, difficulty, isOpen));
-
-function getPlayerNameById(game: Game, playerId: string): string | undefined {
-  for (const [name, id] of game.playerIds.entries()) {
+  return games.get(gameId)!;
+}
+function getPlayerNameById(game: Game, playerId: string): string | undefined {  for (const [name, id] of game.playerIds.entries()) {
     if (id === playerId) return name;
   }
   return undefined;
