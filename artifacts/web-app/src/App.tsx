@@ -25,6 +25,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Game} />
       <Route path="/game" component={Game} />
+      <Route path="/join/:code" component={Game} />
       <Route path="/demo" component={DemoPage} />
       <Route component={NotFound} />
     </Switch>

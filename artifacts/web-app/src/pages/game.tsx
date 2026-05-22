@@ -600,14 +600,14 @@ export default function Game() {
 
   useEffect(() => {
     const path = window.location.pathname;
-    const match = path.match(/^\/join\/(.+)$/);
+    const match = path.match(/^\/join\/([^/]+)$/);
     if (match?.[1]) {
-      setRoomInput(match[1]);
+      setRoomInput(decodeURIComponent(match[1]));
       setLobbyMode("join");
       window.history.replaceState({}, "", "/");
     }
   }, []);
-
+   
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
