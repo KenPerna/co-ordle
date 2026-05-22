@@ -819,11 +819,10 @@ export default function Game() {
           </>
           )}
 
-          {/* Create flow */}
-          {lobbyMode === "create" && (
-            <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 12 }}>
-              <h2 style={s.lobbyTitle}>Create a Game</h2>
-
+         {/* Create flow */}
+         {lobbyMode === "create" && (
+            <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 8 }}>
+              <h2 style={{ ...s.lobbyTitle, margin: "0 0 4px" }}>Create a Game</h2>
               {/* Room code display */}
               <div>
                 <label style={s.lobbyLabel}>Your Room Code</label>
@@ -878,7 +877,7 @@ export default function Game() {
 
               {/* Public listing toggle */}
               <div
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 10, padding: "12px 14px", cursor: "pointer" }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 10, padding: "8px 12px", cursor: "pointer" }}
                 onClick={() => setIsOpenGame((v) => !v)}
               >
                 <div>
@@ -891,13 +890,13 @@ export default function Game() {
               </div>
 
               <button
-                style={{ ...s.btn, width: "100%", fontSize: 17, padding: "14px 0", marginTop: 4 }}
+                style={{ ...s.btn, width: "100%", fontSize: 15, padding: "11px 0", marginTop: 2 }}
                 onClick={joinRoom}
               >
                 Launch Game
               </button>
               <button
-                style={{ ...s.btn, width: "100%", fontSize: 14, padding: "12px 0", background: "#2a2a2c", color: "#ccc" }}
+                style={{ ...s.btn, width: "100%", fontSize: 13, padding: "9px 0", background: "#2a2a2c", color: "#ccc" }}
                 onClick={() => {
                   const url = `${window.location.origin}/join/${generatedCode}`;
                   navigator.clipboard.writeText(url).then(() => alert(`Invite link copied!\n${url}`));
@@ -1207,7 +1206,7 @@ const s: Record<string, React.CSSProperties> = {
   tokenBadge: { display: "flex", alignItems: "center", gap: 3, background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 20, padding: "2px 7px", fontSize: 11, color: "#ccc", flexShrink: 0 },
   leaveBtn: { marginLeft: "auto", padding: "4px 10px", borderRadius: 8, border: "1px solid #3a3a3c", background: "transparent", color: "#818384", fontSize: 12, cursor: "pointer", flexShrink: 0 },
   playerTag: { fontSize: 12, fontWeight: 700, flexShrink: 0 },
-  lobby: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, overflowY: "auto" },
+  lobby: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "16px 24px", overflowY: "auto" },
   lobbyLabel: { fontSize: 11, color: "#818384", textTransform: "uppercase" as const, letterSpacing: 1, display: "block", marginBottom: 6 },
   lobbyTitle: { margin: "0 0 24px", fontSize: 26, fontWeight: 800 },
   main: { display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" },
@@ -1215,7 +1214,7 @@ const s: Record<string, React.CSSProperties> = {
   statusText: { fontSize: 13, color: "#818384", margin: 0, textAlign: "center", flexShrink: 0 },
   boardLabel: { fontSize: 11, color: "#818384", textTransform: "uppercase", letterSpacing: 1, margin: "0 0 4px", textAlign: "center" },
   inputRow: { display: "flex", gap: 6, width: "100%" },
-  input: { padding: "10px 12px", borderRadius: 10, border: "1px solid #3a3a3c", background: "#1a1a1b", color: "#fff", fontSize: 15, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
+  input: { padding: "8px 12px", borderRadius: 10, border: "1px solid #3a3a3c", background: "#1a1a1b", color: "#fff", fontSize: 15, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
   btn: { padding: "10px 14px", borderRadius: 10, border: "none", background: "#538d4e", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", whiteSpace: "nowrap" },
   chatStrip: { flexShrink: 0, borderTop: "1px solid #2a2a2c", background: "#0e0e0f", padding: "6px 10px 8px", display: "flex", flexDirection: "column", gap: 4 },
   chatHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
