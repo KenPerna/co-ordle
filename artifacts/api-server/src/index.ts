@@ -35,17 +35,19 @@ interface Game {
   id: string;
   word: string;
   mode: "shared" | "dual";
+  difficulty: "easy" | "regular" | "advanced";
   rounds: Round[];
-  players: string[];              // display names
-  playerIds: Map<string, string>; // displayName → UUID
-  playerSockets: Map<string, string>; // displayName → socketId
+  players: string[];
+  playerIds: Map<string, string>;
+  playerSockets: Map<string, string>;
   usedWords: Set<string>;
   status: "playing" | "won" | "lost";
   winner?: string;
   startTime: number;
-  bountyActive: boolean; // true after a loss — next win earns 2× rewards
+  bountyActive: boolean;
+  isOpen: boolean;
+  lastActivityTime: number;
 }
-
 // ─── Team / token model (in-memory, source of truth is DB) ────────────────────
 
 interface TeamData {
@@ -163,10 +165,10 @@ function applyTeamRewards(team: TeamData, base: ReturnType<typeof calcRewards>):
 
 // ─── Game lifecycle ─────────────────────────────────────────────────────────────
 
-function createGame(gameId: string, mode: "shared" | "dual", difficulty: "easy" | "regular" | "advanced" = "regular"): Game {
+function createGame(gameId: string, mode: "shared" | "dual", difficulty: "easy" | "regular" | "advanced" = "regular", isOpen: boolean = false): Game {
   const word = pickSecretWord(difficulty).toUpperCase();
-  logger.info({ gameId, word, mode }, "Game created");
-  return { id: gameId, word, mode, rounds: [], players: [], playerIds: new Map(), playerSockets: new Map(), usedWords: new Set(), status: "playing", startTime: Date.now(), bountyActive: false };
+  logger.info({ gameId, word, mode, difficulty }, "Game created");
+  return { id: gameId, word, mode, difficulty, rounds: [], players: [], playerIds: new Map(), playerSockets: new Map(), usedWords: new Set(), status: "playing", startTime: Date.now(), bountyActive: false, isOpen, lastActivityTime: Date.now() };
 }
 
 function resetGame(game: Game): void {
@@ -181,10 +183,8 @@ function resetGame(game: Game): void {
   logger.info({ gameId: game.id, word: game.word, bountyActive: game.bountyActive }, "New round");
 }
 
-function getOrCreateGame(gameId: string, mode: "shared" | "dual", difficulty: "easy" | "regular" | "advanced" = "regular"): Game {
-  if (!games.has(gameId)) games.set(gameId, createGame(gameId, mode, difficulty));
-  return games.get(gameId)!;
-}
+function getOrCreateGame(gameId: string, mode: "shared" | "dual", difficulty: "easy" | "regular" | "advanced" = "regular", isOpen: boolean = false): Game {
+  if (!games.has(gameId)) games.set(gameId, createGame(gameId, mode, difficulty, isOpen));
 
 function getPlayerNameById(game: Game, playerId: string): string | undefined {
   for (const [name, id] of game.playerIds.entries()) {
@@ -322,6 +322,7 @@ function handleSharedGuess(game: Game, playerId: string, guess: string): void {
   if (game.usedWords.has(guess)) { io.to(game.id).emit("wordAlreadyUsed", { guess }); return; }
 
   game.usedWords.add(guess);
+  game.lastActivityTime = Date.now();
   const result = evaluateGuess(game.word.toLowerCase(), guess);
   const won = result.every((r) => r === "green");
   game.rounds.push({ type: "shared", guess, result, player: playerId });
@@ -350,6 +351,7 @@ function handleDualGuess(game: Game, playerId: string, guess: string, submitter:
   }
 
   game.usedWords.add(key);
+  game.lastActivityTime = Date.now();
   const activePlayerIds = getActiveDualPlayerIds(game);
   let round = game.rounds[game.rounds.length - 1] as DualRound | undefined;
 
@@ -396,6 +398,29 @@ function handleDualGuess(game: Game, playerId: string, guess: string, submitter:
   }
 }
 
+
+// ─── Room browser API ──────────────────────────────────────────────────────────
+app.get("/api/rooms", (_req, res) => {
+  const STALE_MS = 15 * 60 * 1000; // 15 minutes
+  const now = Date.now();
+  const openRooms = Array.from(games.values())
+    .filter((g) =>
+      g.isOpen &&
+      g.status === "playing" &&
+      now - g.lastActivityTime < STALE_MS &&
+      g.players.length < 2
+    )
+    .sort((a, b) => b.lastActivityTime - a.lastActivityTime)
+    .map((g) => ({
+      id: g.id,
+      mode: g.mode,
+      difficulty: g.difficulty,
+      players: g.players.length,
+      lastActivityTime: g.lastActivityTime,
+    }));
+  res.json(openRooms);
+});
+
 // ─── Socket.IO ──────────────────────────────────────────────────────────────────
 
 io.on("connection", (socket) => {
@@ -403,15 +428,18 @@ io.on("connection", (socket) => {
   let currentRoom: string | null = null;
   let currentPlayer: string | null = null;
 
-  socket.on("joinRoom", async ({ gameId, player, playerId, mode = "shared", difficulty = "regular" }: {
-    gameId: string; player: string; playerId?: string; mode?: "shared" | "dual"; difficulty?: "easy" | "regular" | "advanced";
+  socket.on("joinRoom", async ({ gameId, player, playerId, mode = "shared", difficulty = "regular", isOpen = false }: {
+    gameId: string; player: string; playerId?: string; mode?: "shared" | "dual"; difficulty?: "easy" | "regular" | "advanced"; isOpen?: boolean;
   }) => {
     if (currentRoom) socket.leave(currentRoom);
     currentRoom = gameId;
     currentPlayer = player;
     socket.join(gameId);
 
-    const game = getOrCreateGame(gameId, mode, difficulty);
+    const game = getOrCreateGame(gameId, mode, difficulty, isOpen);
+    game.lastActivityTime = Date.now();
+    // Close room once 2 players have joined
+    if (game.players.length >= 2) game.isOpen = false;
     if (!game.players.includes(player)) game.players.push(player);
     game.playerSockets.set(player, socket.id);
     if (playerId) game.playerIds.set(player, playerId);
@@ -473,6 +501,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("chat", ({ gameId, player, text }: { gameId: string; player: string; text: string }) => {
+    const game = games.get(gameId);
+    if (game) game.lastActivityTime = Date.now();
     io.to(gameId).emit("chatMessage", { player, text });
   });
 

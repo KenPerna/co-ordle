@@ -408,7 +408,11 @@ export default function Game() {
   const [nameInput, setNameInput] = useState(() => getStoredPlayerName());
   const [playerName, setPlayerName] = useState(() => getStoredPlayerName() || `Player${Math.floor(Math.random() * 900 + 100)}`);
 
-  const [lobbyMode, setLobbyMode] = useState<"pick" | "create" | "join">("pick");
+  const [lobbyMode, setLobbyMode] = useState<"pick" | "create" | "join" | "browse">("pick");
+  const [isOpenGame, setIsOpenGame] = useState(false);
+  const [openRooms, setOpenRooms] = useState<{ id: string; mode: string; difficulty: string; players: number; lastActivityTime: number }[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [roomsLastFetched, setRoomsLastFetched] = useState<number | null>(null);
   const [roomInput, setRoomInput] = useState("");
   const [generatedCode, setGeneratedCode] = useState(() => generateRoomCode());
   const [modeInput, setModeInput] = useState<GameMode>("shared");
@@ -460,7 +464,6 @@ export default function Game() {
     setChatMessages((prev) => [...prev, { player: "System", text, system: true }]);
 
   useEffect(() => {
-    //old const socket = io();
     const socket = io(import.meta.env.VITE_API_URL);
     socketRef.current = socket;
 
@@ -596,6 +599,16 @@ export default function Game() {
   }, [playerId, playerName]);
 
   useEffect(() => {
+    const path = window.location.pathname;
+    const match = path.match(/^\/join\/(.+)$/);
+    if (match?.[1]) {
+      setRoomInput(match[1]);
+      setLobbyMode("join");
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
@@ -630,7 +643,7 @@ export default function Game() {
       savePlayerName(confirmedName);
       setPlayerName(confirmedName);
     }
-    socketRef.current.emit("joinRoom", { gameId: id, player: confirmedName, playerId, mode: modeInput, difficulty: difficultyInput });
+    socketRef.current.emit("joinRoom", { gameId: id, player: confirmedName, playerId, mode: modeInput, difficulty: difficultyInput, isOpen: lobbyMode === "create" ? isOpenGame : false });
   }, [roomInput, modeInput, nameInput, playerName, playerId, lobbyMode, generatedCode, difficultyInput]);
 
   const leaveRoom = useCallback(() => {
@@ -645,6 +658,8 @@ export default function Game() {
     setGameStatus("playing");
     setShowRewardScreen(false);
     setLobbyMode("pick");
+    setOpenRooms([]);
+    setIsOpenGame(false);
   }, []);
 
   const submitGuess = useCallback(() => {
@@ -668,6 +683,27 @@ export default function Game() {
     setChatInput("");
   }, [chatInput, gameId, playerName]);
 
+  const fetchOpenRooms = useCallback(async () => {
+    setRoomsLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/rooms`);
+      const data = await res.json();
+      setOpenRooms(data);
+      setRoomsLastFetched(Date.now());
+    } catch {
+      setOpenRooms([]);
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (lobbyMode !== "browse") return;
+    fetchOpenRooms();
+    const interval = setInterval(fetchOpenRooms, 15000);
+    return () => clearInterval(interval);
+  }, [lobbyMode, fetchOpenRooms]);
+   
   const sharedBoardRows = sharedRounds.map((r) => ({ letters: r.guess.split(""), colors: r.result as TileColor[] }));
   const myBoardRows = dualRounds.map((r) => ({ letters: r.own ? r.own.word.split("") : [], colors: (r.own?.result ?? []) as TileColor[] }));
   const partnerBoardRows = dualRounds.map((r) => ({ letters: [], colors: (r.partnerResult ?? []) as TileColor[] }));
@@ -768,11 +804,18 @@ export default function Game() {
                   🎮 Create Game
                 </button>
                 <button
-                  style={{ ...s.btn, flex: 1, fontSize: 15, padding: "16px 0", background: "#3b82f6" }}
-                  onClick={() => setLobbyMode("join")}
-                >
-                  🔗 Join Game
-                </button>
+                style={{ ...s.btn, flex: 1, fontSize: 15, padding: "16px 0", background: "#3b82f6" }}
+                onClick={() => setLobbyMode("join")}
+              >
+                🔗 Join Game
+              </button>
+            </div>
+            <button
+              style={{ ...s.btn, width: "100%", maxWidth: 340, fontSize: 15, padding: "14px 0", background: "#7c3aed", marginTop: 8 }}
+              onClick={() => setLobbyMode("browse")}
+            >
+              🎲 Browse Open Games
+            </button>
               </div>
             </>
           )}
@@ -834,11 +877,34 @@ export default function Game() {
                 </select>
               </div>
 
+              {/* Public listing toggle */}
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 10, padding: "12px 14px", cursor: "pointer" }}
+                onClick={() => setIsOpenGame((v) => !v)}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>List game publicly</div>
+                  <div style={{ fontSize: 11, color: "#818384", marginTop: 2 }}>Others can find and join from Browse Open Games</div>
+                </div>
+                <div style={{ width: 38, height: 22, borderRadius: 11, background: isOpenGame ? "#538d4e" : "#3a3a3c", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                  <div style={{ position: "absolute", top: 3, left: isOpenGame ? 19 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+                </div>
+              </div>
+
               <button
                 style={{ ...s.btn, width: "100%", fontSize: 17, padding: "14px 0", marginTop: 4 }}
                 onClick={joinRoom}
               >
                 Launch Game
+              </button>
+              <button
+                style={{ ...s.btn, width: "100%", fontSize: 14, padding: "12px 0", background: "#2a2a2c", color: "#ccc" }}
+                onClick={() => {
+                  const url = `${window.location.origin}/join/${generatedCode}`;
+                  navigator.clipboard.writeText(url).then(() => alert(`Invite link copied!\n${url}`));
+                }}
+              >
+                📋 Copy Invite Link
               </button>
               <button
                 style={{ background: "none", border: "none", color: "#818384", fontSize: 13, cursor: "pointer", textAlign: "center", padding: "4px 0" }}
@@ -895,6 +961,77 @@ export default function Game() {
           {lobbyMode === "pick" && playerStats && (
             <div style={{ width: "100%", maxWidth: 340, marginTop: 20 }}>
               <PlayerStatCard stats={playerStats} label="Your Career Stats" />
+            </div>
+          )}
+
+{/* Browse flow */}
+{lobbyMode === "browse" && (
+            <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <h2 style={{ ...s.lobbyTitle, margin: 0 }}>Open Games</h2>
+                <button
+                  style={{ ...s.btn, padding: "6px 12px", fontSize: 12, background: "#2a2a2c" }}
+                  onClick={fetchOpenRooms}
+                  disabled={roomsLoading}
+                >
+                  {roomsLoading ? "..." : "🔄 Refresh"}
+                </button>
+              </div>
+
+              {roomsLastFetched && (
+                <p style={{ fontSize: 11, color: "#818384", margin: 0 }}>
+                  Updated {Math.round((Date.now() - roomsLastFetched) / 1000)}s ago · auto-refreshes every 15s
+                </p>
+              )}
+
+              {roomsLoading && openRooms.length === 0 && (
+                <p style={{ color: "#818384", fontSize: 13, textAlign: "center", padding: "20px 0" }}>Loading...</p>
+              )}
+
+              {!roomsLoading && openRooms.length === 0 && (
+                <div style={{ textAlign: "center", padding: "30px 0", color: "#818384" }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎮</div>
+                  <div style={{ fontSize: 14 }}>No open games right now.</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Create one and list it publicly!</div>
+                </div>
+              )}
+
+              {openRooms.map((room) => {
+                const minsAgo = Math.round((Date.now() - room.lastActivityTime) / 60000);
+                const difficultyColor = room.difficulty === "easy" ? "#538d4e" : room.difficulty === "advanced" ? "#ef4444" : "#b59f3b";
+                const difficultyLabel = room.difficulty === "easy" ? "Easy" : room.difficulty === "advanced" ? "Advanced" : "Regular";
+                const modeLabel = room.mode === "dual" ? "Dual Brain" : "Shared";
+                return (
+                  <div key={room.id} style={{ background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: 1.5, color: "#fff", marginBottom: 4 }}>{room.id}</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 11, background: "#2a2a2c", borderRadius: 20, padding: "2px 8px", color: "#ccc" }}>{modeLabel}</span>
+                        <span style={{ fontSize: 11, background: "#2a2a2c", borderRadius: 20, padding: "2px 8px", color: difficultyColor, fontWeight: 700 }}>{difficultyLabel}</span>
+                        <span style={{ fontSize: 11, color: "#818384" }}>
+                          {room.players === 1 ? "1 player waiting" : "2 players"} · {minsAgo === 0 ? "just now" : `${minsAgo}m ago`}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      style={{ ...s.btn, padding: "10px 16px", fontSize: 13, background: "#3b82f6", flexShrink: 0 }}
+                      onClick={() => {
+                        setRoomInput(room.id);
+                        setLobbyMode("join");
+                      }}
+                    >
+                      Join →
+                    </button>
+                  </div>
+                );
+              })}
+
+              <button
+                style={{ background: "none", border: "none", color: "#818384", fontSize: 13, cursor: "pointer", textAlign: "center", padding: "4px 0", marginTop: 4 }}
+                onClick={() => setLobbyMode("pick")}
+              >
+                ← Back
+              </button>
             </div>
           )}
 
