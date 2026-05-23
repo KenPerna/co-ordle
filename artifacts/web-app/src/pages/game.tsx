@@ -409,7 +409,7 @@ export default function Game() {
   const [playerName, setPlayerName] = useState(() => getStoredPlayerName() || `Player${Math.floor(Math.random() * 900 + 100)}`);
 
   const [lobbyMode, setLobbyMode] = useState<"pick" | "create" | "join" | "browse">("pick");
-  const [isOpenGame, setIsOpenGame] = useState(false);
+  const [isOpenGame, setIsOpenGame] = useState(true);
   const [openRooms, setOpenRooms] = useState<{ id: string; mode: string; difficulty: string; players: number; lastActivityTime: number }[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomsLastFetched, setRoomsLastFetched] = useState<number | null>(null);
