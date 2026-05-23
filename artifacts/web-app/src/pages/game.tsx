@@ -408,7 +408,7 @@ export default function Game() {
   const [nameInput, setNameInput] = useState(() => getStoredPlayerName());
   const [playerName, setPlayerName] = useState(() => getStoredPlayerName() || `Player${Math.floor(Math.random() * 900 + 100)}`);
 
-  const [lobbyMode, setLobbyMode] = useState<"pick" | "create" | "join" | "browse">("pick");
+  const [lobbyMode, setLobbyMode] = useState<"pick" | "create" | "join">("pick");
   const [isOpenGame, setIsOpenGame] = useState(true);
   const [openRooms, setOpenRooms] = useState<{ id: string; mode: string; difficulty: string; players: number; lastActivityTime: number }[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
@@ -698,8 +698,7 @@ export default function Game() {
   }, []);
 
   useEffect(() => {
-    if (lobbyMode !== "browse") return;
-    fetchOpenRooms();
+    if (lobbyMode !== "join") return;
     const interval = setInterval(fetchOpenRooms, 15000);
     return () => clearInterval(interval);
   }, [lobbyMode, fetchOpenRooms]);
@@ -804,19 +803,13 @@ export default function Game() {
                   🎮 Create Game
                 </button>
                 <button
-                style={{ ...s.btn, flex: 1, fontSize: 15, padding: "16px 0", background: "#3b82f6" }}
-                onClick={() => setLobbyMode("join")}
-              >
-                🔗 Join Game
-              </button>
-            </div>
-            <button
-              style={{ ...s.btn, width: "100%", maxWidth: 340, fontSize: 15, padding: "14px 0", background: "#7c3aed", marginTop: 8 }}
-              onClick={() => setLobbyMode("browse")}
-            >
-              🎲 Browse Open Games
-            </button>
-          </>
+                  style={{ ...s.btn, flex: 1, fontSize: 15, padding: "16px 0", background: "#3b82f6" }}
+                  onClick={() => { fetchOpenRooms(); setLobbyMode("join"); }}
+                >
+                  🔗 Join Game
+                </button>
+              </div>
+            </>
           )}
 
          {/* Create flow */}
@@ -913,62 +906,46 @@ export default function Game() {
             </div>
           )}
 
-          {/* Join flow */}
+{/* Join flow — room code + browse combined */}
           {lobbyMode === "join" && (
-            <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 12 }}>
-              <h2 style={s.lobbyTitle}>Join a Game</h2>
+            <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 10 }}>
+              <h2 style={{ ...s.lobbyTitle, margin: "0 0 4px" }}>Join a Game</h2>
 
+              {/* Room code entry */}
               <div>
-                <label style={s.lobbyLabel}>Room Code</label>
-                <input
-                  style={{ ...s.input, width: "100%", boxSizing: "border-box", letterSpacing: 2, fontWeight: 700 }}
-                  value={roomInput}
-                  placeholder="e.g. TIGER-ACE-42"
-                  onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => e.key === "Enter" && joinRoom()}
-                  autoFocus
-                />
-                <p style={{ fontSize: 12, color: "#818384", margin: "6px 0 0" }}>
-                  Ask the game creator for their room code.
-                </p>
+                <label style={s.lobbyLabel}>Have a Room Code?</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    style={{ ...s.input, flex: 1, boxSizing: "border-box", letterSpacing: 2, fontWeight: 700 }}
+                    value={roomInput}
+                    placeholder="e.g. TIGER-ACE-42"
+                    onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === "Enter" && joinRoom()}
+                    autoFocus
+                  />
+                  <button
+                    style={{ ...s.btn, padding: "8px 16px", background: "#3b82f6", fontSize: 14 }}
+                    onClick={joinRoom}
+                  >
+                    Join
+                  </button>
+                </div>
               </div>
 
-              <button
-                style={{ ...s.btn, width: "100%", fontSize: 17, padding: "14px 0", background: "#3b82f6" }}
-                onClick={joinRoom}
-              >
-                Join Room
-              </button>
-              <button
-                style={{ background: "none", border: "none", color: "#818384", fontSize: 13, cursor: "pointer", textAlign: "center", padding: "4px 0" }}
-                onClick={() => setLobbyMode("pick")}
-              >
-                ← Back
-              </button>
+              {/* Divider */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0" }}>
+                <div style={{ flex: 1, height: 1, background: "#2a2a2c" }} />
+                <span style={{ fontSize: 11, color: "#818384", whiteSpace: "nowrap" }}>or browse open games</span>
+                <div style={{ flex: 1, height: 1, background: "#2a2a2c" }} />
+              </div>
 
-              {/* Career stats */}
-              {playerStats && (
-                <div style={{ marginTop: 8 }}>
-                  <PlayerStatCard stats={playerStats} label="Your Career Stats" />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Career stats on pick screen */}
-          {lobbyMode === "pick" && playerStats && (
-            <div style={{ width: "100%", maxWidth: 340, marginTop: 20 }}>
-              <PlayerStatCard stats={playerStats} label="Your Career Stats" />
-            </div>
-          )}
-
-{/* Browse flow */}
-{lobbyMode === "browse" && (
-            <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Refresh bar */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ ...s.lobbyTitle, margin: 0 }}>Open Games</h2>
+                <span style={{ fontSize: 11, color: "#818384" }}>
+                  {roomsLastFetched ? `Updated ${Math.round((Date.now() - roomsLastFetched) / 1000)}s ago` : "Loading..."}
+                </span>
                 <button
-                  style={{ ...s.btn, padding: "6px 12px", fontSize: 12, background: "#2a2a2c" }}
+                  style={{ ...s.btn, padding: "4px 10px", fontSize: 11, background: "#2a2a2c" }}
                   onClick={fetchOpenRooms}
                   disabled={roomsLoading}
                 >
@@ -976,21 +953,12 @@ export default function Game() {
                 </button>
               </div>
 
-              {roomsLastFetched && (
-                <p style={{ fontSize: 11, color: "#818384", margin: 0 }}>
-                  Updated {Math.round((Date.now() - roomsLastFetched) / 1000)}s ago · auto-refreshes every 15s
-                </p>
-              )}
-
-              {roomsLoading && openRooms.length === 0 && (
-                <p style={{ color: "#818384", fontSize: 13, textAlign: "center", padding: "20px 0" }}>Loading...</p>
-              )}
-
+              {/* Open games list */}
               {!roomsLoading && openRooms.length === 0 && (
-                <div style={{ textAlign: "center", padding: "30px 0", color: "#818384" }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎮</div>
-                  <div style={{ fontSize: 14 }}>No open games right now.</div>
-                  <div style={{ fontSize: 12, marginTop: 4 }}>Create one and list it publicly!</div>
+                <div style={{ textAlign: "center", padding: "16px 0", color: "#818384" }}>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>🎮</div>
+                  <div style={{ fontSize: 13 }}>No open games right now.</div>
+                  <div style={{ fontSize: 11, marginTop: 3 }}>Create one and list it publicly!</div>
                 </div>
               )}
 
@@ -1000,23 +968,20 @@ export default function Game() {
                 const difficultyLabel = room.difficulty === "easy" ? "Easy" : room.difficulty === "advanced" ? "Advanced" : "Regular";
                 const modeLabel = room.mode === "dual" ? "Dual Brain" : "Shared";
                 return (
-                  <div key={room.id} style={{ background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <div key={room.id} style={{ background: "#1a1a1b", border: "1px solid #2a2a2c", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: 1.5, color: "#fff", marginBottom: 4 }}>{room.id}</div>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 11, background: "#2a2a2c", borderRadius: 20, padding: "2px 8px", color: "#ccc" }}>{modeLabel}</span>
-                        <span style={{ fontSize: 11, background: "#2a2a2c", borderRadius: 20, padding: "2px 8px", color: difficultyColor, fontWeight: 700 }}>{difficultyLabel}</span>
-                        <span style={{ fontSize: 11, color: "#818384" }}>
-                          {room.players === 1 ? "1 player waiting" : "2 players"} · {minsAgo === 0 ? "just now" : `${minsAgo}m ago`}
+                      <div style={{ fontWeight: 800, fontSize: 13, letterSpacing: 1, color: "#fff", marginBottom: 3 }}>{room.id}</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 10, background: "#2a2a2c", borderRadius: 20, padding: "2px 7px", color: "#ccc" }}>{modeLabel}</span>
+                        <span style={{ fontSize: 10, background: "#2a2a2c", borderRadius: 20, padding: "2px 7px", color: difficultyColor, fontWeight: 700 }}>{difficultyLabel}</span>
+                        <span style={{ fontSize: 10, color: "#818384" }}>
+                          {room.players === 1 ? "1 waiting" : "2 players"} · {minsAgo === 0 ? "just now" : `${minsAgo}m ago`}
                         </span>
                       </div>
                     </div>
                     <button
-                      style={{ ...s.btn, padding: "10px 16px", fontSize: 13, background: "#3b82f6", flexShrink: 0 }}
-                      onClick={() => {
-                        setRoomInput(room.id);
-                        setLobbyMode("join");
-                      }}
+                      style={{ ...s.btn, padding: "8px 14px", fontSize: 12, background: "#3b82f6", flexShrink: 0 }}
+                      onClick={() => { setRoomInput(room.id); joinRoom(); }}
                     >
                       Join →
                     </button>
@@ -1030,6 +995,19 @@ export default function Game() {
               >
                 ← Back
               </button>
+
+              {playerStats && (
+                <div style={{ marginTop: 4 }}>
+                  <PlayerStatCard stats={playerStats} label="Your Career Stats" />
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Career stats on pick screen */}
+          {lobbyMode === "pick" && playerStats && (
+            <div style={{ width: "100%", maxWidth: 340, marginTop: 20 }}>
+              <PlayerStatCard stats={playerStats} label="Your Career Stats" />
             </div>
           )}
 
